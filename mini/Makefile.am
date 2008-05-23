@@ -4,6 +4,8 @@ INCLUDES             = -I$(top_builddir) -I$(top_builddir)/avmon \
 		       -I$(top_srcdir) -I$(top_srcdir)/avmon \
 		       $(GLIB_CFLAGS)
 
+AM_CFLAGS            = -Wall -g
+
 bin_PROGRAMS         = mini-monitor mini-query
 
 mini_monitor_SOURCES = mini-monitor.c 
