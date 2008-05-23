@@ -21,7 +21,7 @@
 /**
  * \file net.c
  * \author Ramses Morales
- * \version $Id: net.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: net.c,v 1.2 2008/05/23 22:50:30 ramses Exp $
  */
 
 #include <stdio.h>
@@ -33,6 +33,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <errno.h>
+#include <signal.h>
 #include "net.h"
 #include "util.h"
 
@@ -45,6 +46,18 @@ net_error_quark(void)
 	quark = g_quark_from_static_string("net-error-quark");
     
     return quark;
+}
+
+static gboolean INIT = FALSE;
+
+void
+net_init(void)
+{
+    if ( INIT )
+	return;
+    INIT = TRUE;
+    
+    signal(SIGPIPE, SIG_IGN);
 }
 
 /************************************************

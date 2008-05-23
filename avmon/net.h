@@ -21,7 +21,7 @@
 /**
  * \file net.h
  * \author Ramses Morales
- * \version $Id: net.h,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: net.h,v 1.2 2008/05/23 22:50:30 ramses Exp $
  */
 
 #ifndef __AVMON_NET_H__
@@ -42,6 +42,7 @@ AVMON_BEGIN_DECLS
 
 #define NET_IP_CHAR_SIZE 16
 
+void net_init(void);
 int net_read(int fd, void *buff, size_t *count, GError **gerror);
 int net_read_byte(int fd, uint8_t *buff, GError **gerror);
 int net_write(int fd, const void *buff, size_t count, GError **gerror);

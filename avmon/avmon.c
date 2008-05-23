@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.2 2008/05/23 09:44:46 ramses Exp $
+ * \version $Id: avmon.c,v 1.3 2008/05/23 22:50:30 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1114,6 +1114,8 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 {
     AVMONNode *node = NULL;
     Conf *conf = NULL;
+
+    net_init();
 
     //configuration:
 #ifdef DEBUG

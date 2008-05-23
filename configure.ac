@@ -39,6 +39,7 @@ AC_TYPE_UINT8_T
 
 # Checks for library functions.
 AC_FUNC_SELECT_ARGTYPES
+AC_TYPE_SIGNAL
 AC_FUNC_STRERROR_R
 AC_CHECK_FUNCS([gethostname gettimeofday memset mkfifo pow select socket strerror strstr])
 
