@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: avmon.c,v 1.2 2008/05/23 09:44:46 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1162,8 +1162,8 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 #ifdef DEBUG
     g_debug("joining the overlay");
 #endif
-    if ( g_ascii_strncasecmp(conf_get_introducer_name(node->conf), 
-			     AVMON_INTRODUCER_NONE, strlen(AVMON_INTRODUCER_NONE)) ) {
+    if ( !g_ascii_strncasecmp(conf_get_introducer_name(node->conf), 
+			      AVMON_INTRODUCER_NONE, strlen(AVMON_INTRODUCER_NONE)) ) {
 	//this must be the first node to join
 	node->join_status = JOIN_STATUS_ALONE;
     } else {
