@@ -21,7 +21,7 @@
 /**
  * \file listener.c
  * \author Ramses Morales
- * \version $Id: listener.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: listener.c,v 1.2 2008/05/27 17:57:17 ramses Exp $
  */
 
 #include <unistd.h>
@@ -359,7 +359,7 @@ tcp_listener(void *_al)
 	    pack_args->al = al;
 
 	    util_counter_inc(al->tcp_thread_count);
-	    if ( pthread_create(&tid, &thread_attr, packet_handlers[type],
+	    if ( pthread_create(&tid, &thread_attr, packet_handlers[type + 1],
 				(void *) pack_args) ) {
 		close(connection_fd);
 		g_free(pack_args);
@@ -488,7 +488,7 @@ udp_listener(void *_al)
 	
 	util_counter_inc(al->udp_thread_count);
 	if ( pthread_create(&tid, &thread_attr, 
-			    datagram_handlers[msg_datagram_type(buffer)],
+			    datagram_handlers[msg_datagram_type(buffer) + 1],
 			    (void *) dhargs)) {
 	    g_free(dhargs);
 	    util_counter_dec(al->udp_thread_count);
