@@ -21,7 +21,7 @@
 /**
  * \file listener.c
  * \author Ramses Morales
- * \version $Id: listener.c,v 1.2 2008/05/27 17:57:17 ramses Exp $
+ * \version $Id: listener.c,v 1.3 2008/05/27 20:04:00 ramses Exp $
  */
 
 #include <unistd.h>
@@ -97,6 +97,10 @@ handle_join(void *args)
 
     pthread_detach(pthread_self());
 
+#ifdef DEBUG
+    g_debug("handle_join");
+#endif
+
     inet_ntop(AF_INET, &pargs->peer_addr.sin_addr, ip, NET_IP_CHAR_SIZE);
     avmon_receive_join(pargs->al->node, pargs->connection_fd, ip);
 
@@ -114,6 +118,10 @@ handle_cv_fetch(void *args)
     
     pthread_detach(pthread_self());
 
+#ifdef DEBUG
+    g_debug("handle_cv_fetch");
+#endif
+
     avmon_receive_cv_fetch(pargs->al->node, pargs->connection_fd);
 
     util_counter_dec(pargs->al->tcp_thread_count);
@@ -130,6 +138,10 @@ handle_get_ps(void *args)
     
     pthread_detach(pthread_self());
 
+#ifdef DEBUG
+    g_debug("handle_get_ps");
+#endif
+
     avmon_receive_get_ps(pargs->al->node, pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
@@ -145,6 +157,10 @@ handle_get_raw_availability(void *args)
     PacketHandlerArgs *pargs = (PacketHandlerArgs *) args;
     
     pthread_detach(pthread_self());
+
+#ifdef DEBUG
+    g_debug("handle_get_raw_availability");
+#endif
     
     avmon_receive_get_raw_availability(pargs->al->node, pargs->connection_fd);
     
@@ -351,6 +367,9 @@ tcp_listener(void *_al)
 		close(connection_fd);
 		continue;
 	    }
+#ifdef DEBUG
+	    g_debug("listener received %u", type);
+#endif
 	    
 	    pack_args = g_new0(PacketHandlerArgs, 1);
 	    pack_args->peer_len = connection_len;
@@ -359,7 +378,7 @@ tcp_listener(void *_al)
 	    pack_args->al = al;
 
 	    util_counter_inc(al->tcp_thread_count);
-	    if ( pthread_create(&tid, &thread_attr, packet_handlers[type + 1],
+	    if ( pthread_create(&tid, &thread_attr, packet_handlers[type - 1],
 				(void *) pack_args) ) {
 		close(connection_fd);
 		g_free(pack_args);
@@ -488,7 +507,7 @@ udp_listener(void *_al)
 	
 	util_counter_inc(al->udp_thread_count);
 	if ( pthread_create(&tid, &thread_attr, 
-			    datagram_handlers[msg_datagram_type(buffer) + 1],
+			    datagram_handlers[msg_datagram_type(buffer) - 1],
 			    (void *) dhargs)) {
 	    g_free(dhargs);
 	    util_counter_dec(al->udp_thread_count);
