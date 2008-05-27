@@ -19,7 +19,7 @@
 /**
  * \file mini-monitor.c
  * \author Ramses Morales
- * \version $Id: mini-monitor.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: mini-monitor.c,v 1.2 2008/05/27 17:26:08 ramses Exp $
  */
 
 #include <stdio.h>
@@ -150,6 +150,9 @@ do_stop(void)
 static void
 do_quit(void)
 {
+    if ( node ) 
+	do_stop();
+
     close(n_pipe);
     close(ignore_me);
 
