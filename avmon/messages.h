@@ -21,7 +21,7 @@
 /**
  * \file messages.h
  * \author Ramses Morales
- * \version $Id: messages.h,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: messages.h,v 1.2 2008/05/27 17:56:38 ramses Exp $
  */
 
 #ifndef __AVMON_MESSAGES_H__
@@ -43,6 +43,7 @@ AVMON_BEGIN_DECLS
 #define MSG_ERROR_NOT_GET_RAW_AVAILABILITY_REPLY 7
 #define MSG_ERROR_GET_RAW_AVAILABILITY_REPLY     8
 #define MSG_ERROR_IP                             9
+#define MSG_ERROR_INVALID_PACKET_TYPE            10
 
 enum MsgDatagramTypes {
     MSG_PING           = 0X01,
@@ -58,15 +59,15 @@ enum MsgPacketType {
     MSG_JOIN                 = 0X01,
     MSG_CV_FETCH             = 0X02,
     MSG_GET_PS               = 0X03,
-    MSG_GET_RAW_AVAILABILITY = 0X04,
-    MSG_NOT_A_PACKET         = 0X05
+    MSG_GET_RAW_AVAILABILITY = 0X04
 };
 
 enum MsgPacketReplyType {
-    MSG_JOIN_REPLY                 = 0X06,
-    MSG_FETCH_REPLY                = 0X07,
-    MSG_GET_PS_REPLY               = 0X08,
-    MSG_GET_RAW_AVAILABILITY_REPLY = 0X09
+    MSG_JOIN_REPLY                 = 0X05,
+    MSG_FETCH_REPLY                = 0X06,
+    MSG_GET_PS_REPLY               = 0X07,
+    MSG_GET_RAW_AVAILABILITY_REPLY = 0X08,
+    MSG_NOT_A_PACKET               = 0X09
 };
 
 extern const char *MSG_HEAD;
@@ -91,8 +92,7 @@ typedef struct {
     char ip[NET_IP_CHAR_SIZE + 1];
 } MsgForwardData;
 
-#define msg_read_type(sfd,buff,gerror) net_read_byte(sfd,buff,gerror)
-
+int msg_read_type(int socketfd, uint8_t *buff, GError **gerror);
 int msg_datagram_type(const uint8_t *buffer);
 int msg_read_head(int socketfd, GError **gerror);
 int msg_read_join_reply(int socketfd, GError **gerror);

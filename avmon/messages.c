@@ -21,7 +21,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: messages.c,v 1.2 2008/05/27 17:56:38 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -476,7 +476,8 @@ msg_read_join_reply(int socketfd, GError **gerror)
     if ( net_read_byte(socketfd, &octet, gerror) )
 	return 1;
     if ( octet != MSG_JOIN_REPLY ) {
-	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_JOIN_REPLY, "received %u", octet);
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_JOIN_REPLY, 
+		    "expecting %u, received %u", MSG_JOIN_REPLY, octet);
 	return 1;
     }
     return 0;
@@ -489,7 +490,8 @@ msg_read_fetch_reply(int socketfd, GError **gerror)
     if ( net_read_byte(socketfd, &octet, gerror) )
 	return 1;
     if ( octet != MSG_FETCH_REPLY ) {
-	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_FETCH_REPLY, "received %u", octet);
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_FETCH_REPLY,
+		    "expecting %u, received %u", MSG_FETCH_REPLY, octet);
 	return 1;
     }
     return 0;
@@ -520,7 +522,8 @@ msg_is_valid_datagram(const uint8_t *buffer, int bytes)
     if ( !g_str_equal(head, MSG_HEAD) )
 	return FALSE;
     
-    if ( buffer[MSG_HEAD_SIZE] >= MSG_NOT_A_DATAGRAM )
+    if ( (buffer[MSG_HEAD_SIZE] >= MSG_NOT_A_DATAGRAM) 
+	 || (buffer[MSG_HEAD_SIZE] == 0) )
 	return FALSE;
     
     return TRUE;
@@ -561,8 +564,8 @@ msg_read_get_ps_reply(int socketfd, GError **gerror)
     if ( net_read_byte(socketfd, &octet, gerror) )
 	return 1;
     if ( octet != MSG_GET_PS_REPLY ) {
-	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_GET_PS_REPLY, "received %u",
-		    octet);
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_GET_PS_REPLY,
+		    "expecting %u, received %u", MSG_GET_PS_REPLY, octet);
 	return 1;
     }
     return 0;
@@ -582,7 +585,7 @@ msg_read_get_raw_availability_reply(int socketfd, GError **gerror)
 	return 1;
     if ( octet != MSG_GET_RAW_AVAILABILITY_REPLY ) {
 	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_GET_RAW_AVAILABILITY_REPLY,
-		    "received %u", octet);
+		    "expecting %u, received %u", MSG_GET_RAW_AVAILABILITY_REPLY, octet);
 	return 1;
     }
     return 0;
@@ -741,4 +744,20 @@ GPtrArray *
 msg_read_target(int socketfd, GError **gerror)
 {
     return msg_extract_ids(socketfd, gerror);
+}
+
+int
+msg_read_type(int socketfd, uint8_t *buff, GError **gerror)
+{
+    int res = net_read_byte(socketfd, buff, gerror);
+    if ( *gerror || res )
+	return res;
+
+    if ( (*buff >= MSG_NOT_A_PACKET) || (*buff == 0) ) {
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_INVALID_PACKET_TYPE,
+		    "invalid packet type %u", *buff);
+	return -1;
+    }
+
+    return 0;
 }
