@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.3 2008/05/23 22:50:30 ramses Exp $
+ * \version $Id: avmon.c,v 1.4 2008/05/27 20:43:52 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -161,10 +161,12 @@ cv_random_peer(AVMONNode *node)
 {
     int i;
     AVMONPeer *peer = NULL;
-    
+
     pthread_mutex_lock(&node->mutex_cv);
-    i = g_rand_int_range(node->grand, 0, g_hash_table_size(node->cv));
-    peer = g_hash_table_find(node->cv, _cv_random_peer, &i);
+    if ( g_hash_table_size(node->cv) ) {
+	i = g_rand_int_range(node->grand, 0, g_hash_table_size(node->cv));
+	peer = g_hash_table_find(node->cv, _cv_random_peer, &i);
+    }
     pthread_mutex_unlock(&node->mutex_cv);
 
     return peer;
@@ -760,6 +762,9 @@ do_forward(AVMONNode *node, uint8_t weight, uint16_t joiner_port,
     w_c = (uint8_t) ceil((double) weight / (double) 2.0);
 	
     forward_peer = cv_random_peer(node);
+    if ( !forward_peer )
+	return; //TODO: inform that this node could not forward
+
     msg_send_forward(forward_peer->ip, forward_peer->port, joiner_port,
 		     joiner_ip, w_c);
 
@@ -794,6 +799,9 @@ avmon_receive_join(AVMONNode *node, int socketfd, const char *peer_ip)
     uint16_t peer_port;
     uint8_t weight;
     GError *gerror = NULL;
+#ifdef DEBUG
+    g_debug("avmon receive join");
+#endif
 
     if ( msg_read_join_payload(socketfd, &peer_port, &weight, &gerror) ) {
 	if ( gerror ) 
@@ -807,6 +815,9 @@ avmon_receive_join(AVMONNode *node, int socketfd, const char *peer_ip)
     peer_array = cv_to_array(node);
     msg_write_join_reply(socketfd, peer_array, &gerror);
     g_ptr_array_free(peer_array, TRUE);
+#ifdef DEBUG
+    g_debug("done with receive join");
+#endif
 }
 
 void
@@ -930,20 +941,28 @@ main_loop(void *_node)
 	
 	//cv_ping
 	node->pinged_peer = cv_random_peer(node);
-	node->pinged_peer->answered_ping = FALSE;
-	msg_send_cv_ping(node->pinged_peer->ip, node->pinged_peer->port,
-			 node->port);
-	sleep(5); //TODO: make configurable
+	if ( node->pinged_peer ) {
+	    node->pinged_peer->answered_ping = FALSE;
+	    msg_send_cv_ping(node->pinged_peer->ip, node->pinged_peer->port,
+			     node->port);
+	    sleep(5); //TODO: make configurable
 	
-	if ( !node->pinged_peer->answered_ping ) {
-	    cv_delete(node, node->pinged_peer);
-	    peer_free(node->pinged_peer); //TODO
-	}
+	    if ( !node->pinged_peer->answered_ping ) {
+		cv_delete(node, node->pinged_peer);
+		peer_free(node->pinged_peer); //TODO
+	    }
 
-	node->pinged_peer = NULL;
+	    node->pinged_peer = NULL;
+	}
 
 	//contact random
 	random_peer = cv_random_peer(node);
+	if ( !random_peer ) {
+#ifdef DEBUG
+	    g_debug("no random peer to fetch cv");
+#endif   
+	    continue;
+	}
 	if ( peer_info )
 	    freeaddrinfo(peer_info);
 	if ( !(peer_info = net_char_to_addrinfo(random_peer->ip,
