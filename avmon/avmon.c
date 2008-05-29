@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.5 2008/05/29 04:56:47 ramses Exp $
+ * \version $Id: avmon.c,v 1.6 2008/05/29 05:24:33 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1286,21 +1286,12 @@ avmon_get_ping_set(const char *target, const char *target_port, GError **gerror)
 	goto bye;
     }
     
-#ifdef DEBUG
-    printf("send_get_ps\n");
-#endif
     if ( msg_send_get_ps(socketfd, gerror) )
 	goto bye;
 
-#ifdef DEBUG
-    printf("read_get_ps_reply");
-#endif
     if ( msg_read_get_ps_reply(socketfd, gerror) )
 	goto bye;
 
-#ifdef DEBUG
-    printf("proc. ps reply");
-#endif
     if ( !(ip_port_array = msg_read_ps(socketfd, gerror)) )
 	goto bye;
     
