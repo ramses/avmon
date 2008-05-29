@@ -21,7 +21,7 @@
 /**
  * \file listener.c
  * \author Ramses Morales
- * \version $Id: listener.c,v 1.4 2008/05/29 04:17:38 ramses Exp $
+ * \version $Id: listener.c,v 1.5 2008/05/29 22:12:45 ramses Exp $
  */
 
 #include <unistd.h>
@@ -106,6 +106,8 @@ handle_join(void *args)
 
     util_counter_dec(pargs->al->tcp_thread_count);
 
+    g_free(args);
+
     pthread_exit(NULL);
 }
 
@@ -125,6 +127,8 @@ handle_cv_fetch(void *args)
     avmon_receive_cv_fetch(pargs->al->node, pargs->connection_fd);
 
     util_counter_dec(pargs->al->tcp_thread_count);
+
+    g_free(args);
     
     pthread_exit(NULL);
 }
@@ -145,6 +149,8 @@ handle_get_ps(void *args)
     avmon_receive_get_ps(pargs->al->node, pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
+
+    g_free(args);
     
     pthread_exit(NULL);
 }
@@ -165,6 +171,8 @@ handle_get_raw_availability(void *args)
     avmon_receive_get_raw_availability(pargs->al->node, pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
+
+    g_free(args);
     
     pthread_exit(NULL);
 }
@@ -176,16 +184,15 @@ static void *
 handle_monitoring_ping(void *args)
 {
     DatagramHandlerArgs *dhargs = (DatagramHandlerArgs *) args;
-    AVMONListener *al = dhargs->al;
     
     pthread_detach(pthread_self());
 
     avmon_receive_monitoring_ping(dhargs->al->node, dhargs->buff, &dhargs->cliaddr);
 
+    util_counter_dec(dhargs->al->udp_thread_count);
+
     g_free(args);
 
-    util_counter_dec(al->udp_thread_count);
-    
     pthread_exit(NULL);
 }
 
@@ -201,9 +208,9 @@ handle_cv_ping(void *args)
     
     avmon_receive_cv_ping(dhargs->al->node, dhargs->buff, &dhargs->cliaddr);
     
-    g_free(args);
-    
     util_counter_dec(dhargs->al->udp_thread_count);
+
+    g_free(args);
     
     pthread_exit(NULL);
 }
@@ -223,9 +230,9 @@ handle_monitoring_pong(void *args)
 
     avmon_receive_monitoring_pong(dhargs->al->node, ip, dhargs->buff);
 
-    g_free(args);
-    
     util_counter_dec(dhargs->al->udp_thread_count);
+
+    g_free(args);
     
     pthread_exit(NULL);
 }
@@ -245,10 +252,10 @@ handle_cv_pong(void *args)
 
     avmon_receive_cv_pong(dhargs->al->node, ip, dhargs->buff);
 
-    g_free(args);
-    
     util_counter_dec(dhargs->al->udp_thread_count);
-    
+
+    g_free(args);    
+
     pthread_exit(NULL);
 }
 
