@@ -21,7 +21,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.2 2008/05/27 17:56:38 ramses Exp $
+ * \version $Id: messages.c,v 1.3 2008/05/29 04:21:41 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -60,7 +60,7 @@ msg_send_cv_ping(const char *peer_ip, const char *peer_port, uint16_t my_port)
     	
     memset(&pinged_peer, 0, sizeof(struct sockaddr_in));
     pinged_peer.sin_family = AF_INET;
-    pinged_peer.sin_port = atoi(peer_port);
+    pinged_peer.sin_port = htons(atoi(peer_port));
     inet_pton(AF_INET, peer_ip, &pinged_peer.sin_addr);
     pingfd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -82,7 +82,7 @@ msg_send_forward(const char *forward_ip, const char *forward_port,
     
     memset(&forward, 0, sizeof(struct sockaddr_in));
     forward.sin_family = AF_INET;
-    forward.sin_port = atoi(forward_port);
+    forward.sin_port = htons(atoi(forward_port));
     inet_pton(AF_INET, forward_ip, &forward.sin_addr);
     ffd = socket(AF_INET, SOCK_DGRAM, 0);
 
@@ -166,16 +166,16 @@ msg_send_notify(const char *i_ip, const char *i_port, const char *j_ip,
     int fd, size;
     uint8_t *msg_notify;
     uint16_t payload_size;
-    char *ids = g_strconcat(i_ip, MSG_DELIMITER, i_port, MSG_DELIMITER, j_ip,
-			   MSG_DELIMITER, j_port, NULL);
+    char *ids = g_strconcat(i_ip, MSG_DELIMITER_S, i_port, MSG_DELIMITER_S, j_ip,
+			    MSG_DELIMITER_S, j_port, NULL);
 
     memset(&i, 0, sizeof(struct sockaddr_in));
     memset(&j, 0, sizeof(struct sockaddr_in));
 
     i.sin_family = AF_INET;
     j.sin_family = AF_INET;
-    i.sin_port = atoi(i_port);
-    j.sin_port = atoi(j_port);
+    i.sin_port = htons(atoi(i_port));
+    j.sin_port = htons(atoi(j_port));
     inet_pton(AF_INET, i_ip, &i.sin_addr);
     inet_pton(AF_INET, j_ip, &j.sin_addr);
 
@@ -211,7 +211,7 @@ msg_send_monitoring_ping(const char *ip, const char *port, uint16_t my_port,
     
     memset(&ping_addr, 0, sizeof(ping_addr));
     ping_addr.sin_family = AF_INET;
-    ping_addr.sin_port = atoi(port);
+    ping_addr.sin_port = htons(atoi(port));
     if ( !inet_pton(AF_INET, ip, &ping_addr.sin_addr) ) {
 	g_set_error(gerror, MSG_ERROR, MSG_ERROR_IP, "%s is not an IP", ip);
 	return -1;
@@ -236,7 +236,7 @@ msg_send_monitoring_pong(struct sockaddr_in *peer_addr, uint16_t peer_port,
     uint8_t pong_msg[MSG_PONG_SIZE];
     my_port = htons(my_port);
 
-    peer_addr->sin_port = peer_port;
+    peer_addr->sin_port = htons(peer_port);
     pongfd = socket(AF_INET, SOCK_DGRAM, 0);
     
     memcpy(&pong_msg[0], MSG_HEAD, MSG_HEAD_SIZE);
@@ -255,7 +255,7 @@ msg_send_cv_pong(struct sockaddr_in *peer_addr, uint16_t peer_port,
     uint8_t pong_msg[MSG_CV_PONG_SIZE];
     my_port = htons(my_port);
 
-    peer_addr->sin_port = peer_port;
+    peer_addr->sin_port = htons(peer_port);
     pongfd = socket(AF_INET, SOCK_DGRAM, 0);
     
     memcpy(&pong_msg, MSG_HEAD, MSG_HEAD_SIZE);
@@ -345,7 +345,7 @@ msg_ip_port_list_reply(uint8_t msg_type, const GPtrArray *peer_array)
 	ip = avmon_peer_get_ip(peer);
 	port = avmon_peer_get_port(peer);
 	string = g_string_new(ip);
-	g_string_append_printf(string, "%c%s", MSG_DELIMITER, port);
+	g_string_append_printf(string, "%c%s", MSG_DELIMITER_C, port);
 	g_free(ip);
 	g_free(port);
     }
@@ -355,7 +355,7 @@ msg_ip_port_list_reply(uint8_t msg_type, const GPtrArray *peer_array)
 	ip = avmon_peer_get_ip(peer);
 	port = avmon_peer_get_port(peer);
 	g_string_append_printf(string, "%c%s%c%s",
-			       MSG_DELIMITER, ip, MSG_DELIMITER, port);
+			       MSG_DELIMITER_C, ip, MSG_DELIMITER_C, port);
 	g_free(ip);
 	g_free(port);
     }
@@ -673,7 +673,7 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
     FD_ZERO(&rset);
     FD_SET(socketfd, &rset);
     tv.tv_sec = timeout;
-    tv.tv_sec = 0;
+    tv.tv_usec = 0;
     if ( select(socketfd + 1, &rset, NULL, NULL, &tv) == -1 )
 	goto bye;
     if ( !FD_ISSET(socketfd, &rset) )
@@ -690,7 +690,7 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 	    FD_ZERO(&rset);
 	    FD_SET(socketfd, &rset);
 	    tv.tv_sec = timeout;
-	    tv.tv_sec = 0;
+	    tv.tv_usec = 0;
 	    if ( select(socketfd + 1, &rset, NULL, NULL, &tv) == -1 )
 		goto bye;
 	    
@@ -721,7 +721,7 @@ msg_send_get_raw_availability(int socketfd, const char *target_ip,
     uint16_t target_bytes;
     int size, res;
     GString *string = g_string_new(target_ip);
-    g_string_append_printf(string, "%c%s", MSG_DELIMITER, target_port);
+    g_string_append_printf(string, "%c%s", MSG_DELIMITER_C, target_port);
     
     size = 1 + 2 + string->len;
     msg = (uint8_t *) g_malloc(size);

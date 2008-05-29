@@ -21,7 +21,7 @@
 /**
  * \file messages.h
  * \author Ramses Morales
- * \version $Id: messages.h,v 1.2 2008/05/27 17:56:38 ramses Exp $
+ * \version $Id: messages.h,v 1.3 2008/05/29 04:21:41 ramses Exp $
  */
 
 #ifndef __AVMON_MESSAGES_H__
@@ -83,7 +83,7 @@ extern const char *MSG_HEAD;
 
 #define MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE (1 + 1 + 4)
     
-#define MSG_DELIMITER     '|'
+#define MSG_DELIMITER_C   '|'
 #define MSG_DELIMITER_S   "|"
 
 typedef struct {
