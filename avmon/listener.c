@@ -21,7 +21,7 @@
 /**
  * \file listener.c
  * \author Ramses Morales
- * \version $Id: listener.c,v 1.3 2008/05/27 20:04:00 ramses Exp $
+ * \version $Id: listener.c,v 1.4 2008/05/29 04:17:38 ramses Exp $
  */
 
 #include <unistd.h>
@@ -368,7 +368,7 @@ tcp_listener(void *_al)
 		continue;
 	    }
 #ifdef DEBUG
-	    g_debug("listener received %u", type);
+	    g_debug("tcp_listener received %u", type);
 #endif
 	    
 	    pack_args = g_new0(PacketHandlerArgs, 1);
@@ -471,6 +471,7 @@ udp_listener(void *_al)
     
     biggest_fd =
 	al->udp_fd > al->udp_read_pipe ? al->udp_fd : al->udp_read_pipe;
+    biggest_fd++;
     
     for ( ; ; ) {
 	FD_ZERO(&rset);
