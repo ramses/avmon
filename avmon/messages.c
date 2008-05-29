@@ -21,7 +21,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.3 2008/05/29 04:21:41 ramses Exp $
+ * \version $Id: messages.c,v 1.4 2008/05/29 23:48:10 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -723,14 +723,15 @@ msg_send_get_raw_availability(int socketfd, const char *target_ip,
     GString *string = g_string_new(target_ip);
     g_string_append_printf(string, "%c%s", MSG_DELIMITER_C, target_port);
     
-    size = 1 + 2 + string->len;
+    size = MSG_HEAD_SIZE + 1 + 2 + string->len;
     msg = (uint8_t *) g_malloc(size);
 
-    msg[0] = MSG_GET_RAW_AVAILABILITY;
+    memcpy(msg, MSG_HEAD, MSG_HEAD_SIZE);
+    msg[MSG_HEAD_SIZE] = MSG_GET_RAW_AVAILABILITY;
     target_bytes = string->len;
     target_bytes = htons(target_bytes);
-    memcpy(&msg[1], &target_bytes, 2);
-    memcpy(&msg[1 + 2], string->str, string->len);
+    memcpy(&msg[MSG_HEAD_SIZE + 1], &target_bytes, 2);
+    memcpy(&msg[MSG_HEAD_SIZE + 1 + 2], string->str, string->len);
     
     res = net_write(socketfd, msg, size, gerror);
     
