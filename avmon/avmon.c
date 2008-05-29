@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.4 2008/05/27 20:43:52 ramses Exp $
+ * \version $Id: avmon.c,v 1.5 2008/05/29 04:56:47 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -124,6 +124,12 @@ struct _AVMONNode {
     GPtrArray *peer_trash;
     time_t peer_trash_last_collection;
 };
+
+static inline int
+cv_size(AVMONNode *node)
+{
+    return g_hash_table_size(node->cv);
+}
 
 static inline char *
 cv_key(const char *ip, const char *port)
@@ -650,7 +656,6 @@ avmon_receive_cv_pong(AVMONNode *node, const char *ip, const uint8_t *buff)
     g_free(peer_port_c);
     if ( !peer ) {
 	//TODO: log something
-	g_free(peer_port_c);
 	return;
     }
 
@@ -787,6 +792,7 @@ do_add_joiner(AVMONNode *node, const char *joiner_ip, uint16_t joiner_port)
     
     if ( node->join_status == JOIN_STATUS_ALONE ) {
 	node->join_status = JOIN_STATUS_IN;
+
 	return TRUE;
     }
     return FALSE;
@@ -799,9 +805,6 @@ avmon_receive_join(AVMONNode *node, int socketfd, const char *peer_ip)
     uint16_t peer_port;
     uint8_t weight;
     GError *gerror = NULL;
-#ifdef DEBUG
-    g_debug("avmon receive join");
-#endif
 
     if ( msg_read_join_payload(socketfd, &peer_port, &weight, &gerror) ) {
 	if ( gerror ) 
@@ -815,9 +818,6 @@ avmon_receive_join(AVMONNode *node, int socketfd, const char *peer_ip)
     peer_array = cv_to_array(node);
     msg_write_join_reply(socketfd, peer_array, &gerror);
     g_ptr_array_free(peer_array, TRUE);
-#ifdef DEBUG
-    g_debug("done with receive join");
-#endif
 }
 
 void
@@ -828,6 +828,7 @@ avmon_receive_cv_fetch(AVMONNode *node, int socketfd)
      */
     GError *gerror = NULL;
     GPtrArray *array = cv_to_array(node);
+
     msg_write_fetch_reply(socketfd, array, &gerror);
     if ( gerror ) {
 	g_debug("avmon_receive_cv_fetch: %s", gerror->message);
@@ -957,12 +958,8 @@ main_loop(void *_node)
 
 	//contact random
 	random_peer = cv_random_peer(node);
-	if ( !random_peer ) {
-#ifdef DEBUG
-	    g_debug("no random peer to fetch cv");
-#endif   
+	if ( !random_peer )
 	    continue;
-	}
 	if ( peer_info )
 	    freeaddrinfo(peer_info);
 	if ( !(peer_info = net_char_to_addrinfo(random_peer->ip,
@@ -1002,7 +999,7 @@ main_loop(void *_node)
 	FD_ZERO(&rset);
 	FD_SET(sockfd, &rset);
 	tv.tv_sec = 5; //TODO
-	tv.tv_sec = 0;
+	tv.tv_usec = 0;
 	if ( select(sockfd + 1, &rset, NULL, NULL, &tv) == -1 ) { //TODO: listen to pipe
 	    //TODO: use g_log
 	    char buff[128];
@@ -1059,32 +1056,34 @@ main_loop(void *_node)
 static void
 _avmon_join(const char *ip, const char *port, void *_node)
 {
+    AVMONNode *node = (AVMONNode *) _node;
+    
+    if ( g_str_equal(ip, node->ip_c) && g_str_equal(port, node->port_c) )
+	return; // introducer only knows me
+
     cv_add((AVMONNode *) _node, peer_new(ip, port));
 }
 
 static int
 avmon_join(AVMONNode *node, GError **gerror)
 {
-    struct addrinfo *res  = NULL;
-    int sockfd;
+    struct addrinfo *ai = NULL;
+    int sockfd = -1, result = 1;
     GPtrArray *incoming_cv = NULL;
-    char *i_port_c;
+    char *i_port_c = NULL;
     fd_set rset;
 
     i_port_c = g_strdup_printf("%d", conf_get_introducer_port(node->conf));
-    if ( !(res = net_char_to_addrinfo(conf_get_introducer_name(node->conf), i_port_c,
-				      gerror)) ) {
-	g_free(i_port_c);
-	return 1;
-    }
-    g_free(i_port_c);
-    if ( (sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol)) == -1 ) {
+    if ( !(ai = net_char_to_addrinfo(conf_get_introducer_name(node->conf), i_port_c,
+				      gerror)) )
+	goto bye;
+    if ( (sockfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) == -1 ) {
 	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_JOIN, "creating socket");
-	return 1;
+	goto bye;
     }
-    if ( net_connect_nb(sockfd, res->ai_addr, res->ai_addrlen,
+    if ( net_connect_nb(sockfd, ai->ai_addr, ai->ai_addrlen,
 			conf_get_introducer_timeout(node->conf), 0, gerror) ) {
-	return 1;
+	goto bye;
     }
 
     //TODO: not sure, but something
@@ -1092,31 +1091,46 @@ avmon_join(AVMONNode *node, GError **gerror)
 	g_error("Currently join's weight is limited to 8bit"); //this abort()s
     //TODO
     if ( msg_send_join(sockfd, node->CVS, node->port, gerror) )
-	return 1;
+	goto bye;
 
     FD_ZERO(&rset);
     FD_SET(sockfd, &rset);
     if ( select(sockfd + 1, &rset, NULL, NULL, NULL) == -1 ) {
 	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_JOIN, "sending join");
-	return 1;
+	goto bye;
     }
     
     if ( !FD_ISSET(sockfd, &rset) ) {
 	g_set_error(gerror, AVMON_ERROR, AVMON_ERROR_JOIN, "no answer");
-	return 1;
+	goto bye;
     }
 
     if ( msg_read_join_reply(sockfd, gerror) )
-	return 1;
+	goto bye;
 
     if ( !(incoming_cv = msg_read_cv(sockfd, gerror)) )
-	return 1;
-
-    close(sockfd);
+	goto bye;
 
     process_ip_port_array(incoming_cv, TRUE, _avmon_join, node);
+    if ( !cv_size(node) ) {
+	char i_ip[INET_ADDRSTRLEN + 1];
+	
+	inet_ntop(AF_INET, &((struct sockaddr_in *) ai->ai_addr)->sin_addr, i_ip,
+		  INET_ADDRSTRLEN);
+	cv_add(node, peer_new(i_ip, i_port_c));
+    }
 
-    return 0;
+    result = 0;
+
+bye:
+    if ( i_port_c )
+	g_free(i_port_c);
+    if ( sockfd != -1 )
+	close(sockfd);
+    if ( ai )
+	freeaddrinfo(ai);
+
+    return result;
 }
 
 /**
@@ -1324,7 +1338,7 @@ _avmon_get_raw_availability(void *_agrad)
 {
     AVMONGetRawAvailabilityData *agrad = (AVMONGetRawAvailabilityData *) _agrad;
     GError *gerror = NULL;
-    struct addrinfo *ai;
+    struct addrinfo *ai = NULL;
     char *result = g_strdup_printf("%s_%s_from_%s_%s.raw", agrad->target, 
 				   agrad->target_port, agrad->monitor_ip,
 				   agrad->monitor_port);
@@ -1354,7 +1368,7 @@ _avmon_get_raw_availability(void *_agrad)
     FD_ZERO(&rset);
     FD_SET(socketfd, &rset);
     tv.tv_sec = agrad->timeout;
-    tv.tv_sec = 0;
+    tv.tv_usec = 0;
     if ( select(socketfd + 1, &rset, NULL, NULL, &tv) == -1 )
 	goto bye;
     if ( !FD_ISSET(socketfd, &rset) )
@@ -1369,6 +1383,8 @@ _avmon_get_raw_availability(void *_agrad)
     ok = TRUE;
 
 bye:
+    if ( ai )
+	freeaddrinfo(ai);
     if ( gerror )
 	g_error_free(gerror);
     g_free(agrad->monitor_ip);
