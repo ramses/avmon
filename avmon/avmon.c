@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.6 2008/05/29 05:24:33 ramses Exp $
+ * \version $Id: avmon.c,v 1.7 2008/05/30 00:04:44 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -79,6 +79,7 @@ struct _AVMONPeer {
     gboolean answered_ping;
     FILE *default_output;
     char *default_output_name;
+    gboolean peer_cv; //flag to avoid leaks during shuffle
 };
 
 struct _AVMONNode {
@@ -226,6 +227,7 @@ peer_new(const char *ip, const char *port)
     p->answered_ping = FALSE;
     p->default_output = NULL;
     p->default_output_name = NULL;
+    p->peer_cv = FALSE;
     return p;
 }
 
@@ -275,12 +277,21 @@ avmon_peer_get_port(const AVMONPeer *peer)
     return g_strdup(peer->port);
 }
 
-static void
+static gboolean
 ps_add(AVMONNode *node, AVMONPeer *peer)
 {
+    gboolean result = FALSE;
+    
     pthread_mutex_lock(&node->mutex_ps);
-    g_hash_table_insert(node->ps, peer->key, peer);
+    if ( g_hash_table_lookup(node->ps, peer->key) )
+	result = FALSE;
+    else {
+	result = TRUE;
+	g_hash_table_insert(node->ps, peer->key, peer);
+    }
     pthread_mutex_unlock(&node->mutex_ps);
+
+    return result;
 }
 
 static GPtrArray *
@@ -295,12 +306,41 @@ ps_to_array(AVMONNode *node)
     return array;
 }
 
-static void
+static gboolean
 ts_add(AVMONNode *node, AVMONPeer *peer)
 {
+    gboolean result = FALSE;
+    
     pthread_mutex_lock(&node->mutex_ts);
-    g_hash_table_insert(node->ts, peer->key, peer);
+    if ( g_hash_table_lookup(node->ts, peer->key) )
+	result = FALSE;
+    else {
+	result = TRUE;
+	g_hash_table_insert(node->ts, peer->key, peer);
+    }
     pthread_mutex_unlock(&node->mutex_ts);
+
+    return result;
+}
+
+static AVMONPeer *
+ts_lookup(AVMONNode *node, const char *ip, const char *port)
+{
+    char *key = cv_key(ip, port);
+    AVMONPeer *peer;
+    
+    pthread_mutex_lock(&node->mutex_ts);
+    peer = g_hash_table_lookup(node->ts, key);
+    pthread_mutex_unlock(&node->mutex_ts);
+
+    g_free(key);
+    return peer;
+}
+
+static inline int
+ts_size(AVMONNode *node)
+{
+    return g_hash_table_size(node->ts);
 }
 
 static void
@@ -522,6 +562,8 @@ typedef struct {
     GHashTable *cv;
     AVMONPeer *i;
     AVMONNode *node;
+    gboolean check;
+    GPtrArray *incoming_duplicate;
 } CCData;
 
 static void
@@ -543,7 +585,15 @@ check_condition_i(gpointer key, gpointer value, gpointer data)
     AVMONPeer *peer = (AVMONPeer *) value;
     CCData *ccd = (CCData *) data;
 
-    g_hash_table_insert(ccd->tmp_cvx_cvw, peer->key, peer);
+    if ( ccd->check ) {
+	if ( !g_hash_table_lookup(ccd->tmp_cvx_cvw, peer->key) )
+	    g_hash_table_insert(ccd->tmp_cvx_cvw, peer->key, peer);
+	else
+	    g_ptr_array_add(ccd->incoming_duplicate, peer);
+    } else {
+	if ( peer->peer_cv )
+	    g_hash_table_insert(ccd->tmp_cvx_cvw, peer->key, peer);
+    }
     ccd->i = value;
     g_hash_table_foreach(ccd->cv, check_condition_j, ccd);
 }
@@ -552,20 +602,21 @@ static void
 _avmon_compute_and_shuffle(const char *ip, const char *port, void *_peer_cv)
 {
     AVMONPeer *peer = peer_new(ip, port);
+    peer->peer_cv = TRUE;
     g_hash_table_insert((GHashTable *) _peer_cv, peer->key, peer);
 }
 
 static void
-avmon_compute_and_shuffle(AVMONNode *node, GPtrArray *incoming_cv, 
-			  const char *peer_ip, const char *peer_port)
+avmon_compute_and_shuffle(AVMONNode *node, GPtrArray *incoming_cv,
+			  AVMONPeer *peer)
 {
     AVMONPeer *self = peer_new(node->ip_c, node->port_c);
-    AVMONPeer *tmp_peer = NULL, *peer = peer_new(peer_ip, peer_port);
+    AVMONPeer *tmp_peer = NULL;
     int i, ii, i_rand;
     GHashTable *peer_cv = 
 	g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
     GHashTable *tmp_cvx_cvw = NULL;
-    GPtrArray *tmp_blah = NULL;
+    GPtrArray *tmp_blah = NULL, *incoming_duplicate = NULL;
     CCData ccd;
 
     process_ip_port_array(incoming_cv, TRUE, _avmon_compute_and_shuffle,
@@ -583,8 +634,12 @@ avmon_compute_and_shuffle(AVMONNode *node, GPtrArray *incoming_cv,
     ccd.node = node;
     ccd.tmp_cvx_cvw = tmp_cvx_cvw;
     ccd.cv = peer_cv;
+    ccd.check = FALSE;
     g_hash_table_foreach(node->cv, check_condition_i, &ccd);
     ccd.cv = node->cv;
+    ccd.check = TRUE;
+    incoming_duplicate = g_ptr_array_new();
+    ccd.incoming_duplicate = incoming_duplicate;
     g_hash_table_foreach(peer_cv, check_condition_i, &ccd);
 
     pthread_mutex_unlock(&mutex_evp);
@@ -593,6 +648,13 @@ avmon_compute_and_shuffle(AVMONNode *node, GPtrArray *incoming_cv,
     peer_free(self);
     tmp_blah = util_g_hash_table_to_array(tmp_cvx_cvw);
     g_hash_table_destroy(tmp_cvx_cvw);
+
+    for ( i = incoming_duplicate->len - 1; i >= 0; i-- ) {
+	tmp_peer = g_ptr_array_remove_index_fast(incoming_duplicate, i);
+	peer_free(tmp_peer);
+    }
+    g_ptr_array_free(incoming_duplicate, TRUE);
+    g_hash_table_destroy(peer_cv);
 
     g_hash_table_destroy(node->cv);
     cv_init(node);
@@ -603,10 +665,15 @@ avmon_compute_and_shuffle(AVMONNode *node, GPtrArray *incoming_cv,
 	tmp_peer = g_ptr_array_index(tmp_blah, i_rand);
 	g_hash_table_insert(node->cv, tmp_peer->key, tmp_peer);
 	g_ptr_array_remove_index_fast(tmp_blah, i_rand);
+
+	tmp_peer->peer_cv = FALSE;
     }
     for ( i = tmp_blah->len - 1; i >= 0 ; i-- ) {
 	tmp_peer = g_ptr_array_remove_index(tmp_blah, i);
-	avmon_peer_trash_add(node, tmp_peer);
+	if ( tmp_peer->peer_cv )
+	    peer_free(tmp_peer);
+	else
+	    avmon_peer_trash_add(node, tmp_peer);
     }
     g_ptr_array_free(tmp_blah, TRUE);
 
@@ -627,11 +694,10 @@ avmon_receive_monitoring_pong(AVMONNode *node, const char *ip, const uint8_t *bu
     }
 
     peer_port_c = g_strdup_printf("%d", peer_port);
-    peer = cv_lookup(node, ip, peer_port_c);
+    peer = ts_lookup(node, ip, peer_port_c);
     g_free(peer_port_c);
     if ( !peer ) {
 	//TODO: log something
-	g_free(peer_port_c);
 	return;
     }
 
@@ -744,10 +810,12 @@ avmon_receive_notify(AVMONNode *node, const uint8_t *buff)
     pthread_mutex_unlock(&mutex_evp);
     
     if ( g_str_equal(peer_v->key, node->key) ) {
-	ps_add(node, peer_u);
+	if ( !ps_add(node, peer_u) )
+	    peer_free(peer_u);
 	peer_free(peer_v);
     } else {
-	ts_add(node, peer_v);
+	if ( !ts_add(node, peer_v) )
+	    peer_free(peer_v);
 	peer_free(peer_u);
     }
 }
@@ -912,7 +980,7 @@ main_loop(void *_node)
     GError *gerror = NULL;
     GPtrArray *incoming_cv = NULL;
 
-    for ( ; ; ) {
+    for ( tv.tv_sec = period; ; ) {
 	FD_ZERO(&rset);
 	FD_SET(node->main_pipe[0], &rset);
 	if ( node->latest_iteration ) {
@@ -1039,8 +1107,7 @@ main_loop(void *_node)
 	
 	//compute & shuffle
 	if ( incoming_cv->len ) {
-	    avmon_compute_and_shuffle(node, incoming_cv, random_peer->ip, 
-				      random_peer->port);
+	    avmon_compute_and_shuffle(node, incoming_cv, random_peer);
 	} else {
 	    g_ptr_array_free(incoming_cv, TRUE);
 	}
@@ -1061,7 +1128,8 @@ _avmon_join(const char *ip, const char *port, void *_node)
     if ( g_str_equal(ip, node->ip_c) && g_str_equal(port, node->port_c) )
 	return; // introducer only knows me
 
-    cv_add((AVMONNode *) _node, peer_new(ip, port));
+    if ( !cv_lookup(node, ip, port) )
+	cv_add((AVMONNode *) _node, peer_new(ip, port));
 }
 
 static int
@@ -1351,7 +1419,7 @@ _avmon_get_raw_availability(void *_agrad)
     if ( net_connect_nb(socketfd, ai->ai_addr, ai->ai_addrlen, agrad->timeout, 0,
 			&gerror) )
 	goto bye;
-    
+
     if ( msg_send_get_raw_availability(socketfd, agrad->target,
 				       agrad->target_port, &gerror) )
 	goto bye;
@@ -1362,11 +1430,13 @@ _avmon_get_raw_availability(void *_agrad)
     tv.tv_usec = 0;
     if ( select(socketfd + 1, &rset, NULL, NULL, &tv) == -1 )
 	goto bye;
+
     if ( !FD_ISSET(socketfd, &rset) )
 	goto bye;
     
     if ( msg_read_get_raw_availability_reply(socketfd, &gerror) )
 	goto bye;
+
     if ( msg_read_get_raw_availability_reply_data(socketfd, result, agrad->timeout,
 						  &gerror) )
 	goto bye;
@@ -1402,16 +1472,22 @@ avmon_get_raw_availability(const GPtrArray *monitors, int timeout,
     g_assert(target_port != NULL);
 
     int i;
-    char *result;
+    char *result, target_ip[INET_ADDRSTRLEN + 1];
     GPtrArray *results;
     pthread_t t_ids[monitors->len + 1];
     AVMONGetRawAvailabilityData *agrad;
     AVMONPeer *monitor;
+    struct addrinfo *ai = net_char_to_addrinfo(target, target_port, gerror);
+    if ( !ai )
+	return NULL;
+    inet_ntop(AF_INET, &((struct sockaddr_in *) ai->ai_addr)->sin_addr, target_ip,
+	      INET_ADDRSTRLEN);
+    freeaddrinfo(ai);
 
     for ( i = 0; i < monitors->len; i++ ) {
 	agrad = g_new(AVMONGetRawAvailabilityData, 1);
 	agrad->timeout = timeout;
-	agrad->target = target;
+	agrad->target = target_ip;
 	agrad->target_port = target_port;
 
 	monitor = g_ptr_array_index(monitors, i);
@@ -1446,12 +1522,19 @@ avmon_receive_get_raw_availability(AVMONNode *node, int socketfd)
     if ( gerror || !arr->len )
 	goto bye;
 
-    if ( !(target = cv_lookup(node, g_ptr_array_index(arr, 0), 
-			      g_ptr_array_index(arr, 1))) ) 
+    if ( !(target = ts_lookup(node, g_ptr_array_index(arr, 0), 
+			      g_ptr_array_index(arr, 1))) ) {
 	msg_write_get_raw_availability_reply(socketfd, NULL, &gerror);
-    else
-	msg_write_get_raw_availability_reply(socketfd, target->default_output_name,
-					     &gerror);
+    } else {
+	if ( target->default_output_name ) {
+	    fflush(target->default_output); //TODO: instead of flushing, use a checkpoint
+	    msg_write_get_raw_availability_reply(socketfd, target->default_output_name,
+						 &gerror);
+	} else {
+	    //TODO: send some warning instead of "UNKNOWN"
+	    msg_write_get_raw_availability_reply(socketfd, NULL, &gerror);
+	}
+    }
 
 bye:
     if ( gerror )
