@@ -1,0 +1,19 @@
+AVMON currently works on Linux. Win and Mac platforms are planned.
+
+If downloaded from CVS:
+=======================
+
+You'll need a system with GNU's autotools:
+
+% autoreconf -ivf     #build the auto-configuration script
+% ./configure         #./configure --help, for details
+% make                #build the library and applications
+% make install        #you might need to become root before this step
+
+Official release source code:
+=============================
+% gunzip -c avmon-0.1.tar.gz | tar -xvf -
+% cd avmon-0.1
+% ./configure 
+% make
+% make install
