@@ -19,7 +19,7 @@
 /**
  * \file mini-query.c
  * \author Ramses Morales
- * \version $Id: mini-query.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: mini-query.c,v 1.2 2008/05/30 00:14:41 ramses Exp $
  */
 
 #include <stdio.h>
@@ -93,7 +93,7 @@ main(int argc, char **argv)
 
     if ( query_raw_av ) {
 	if ( !ping_set->len ) {
-	    printf("Can't query availability. %s's ping set is empty\n");
+	    printf("Can't query availability. %s's ping set is empty\n", argv[1]);
 	} else {
 	    if ( !(raw_availabilities = 
 		   avmon_get_raw_availability(ping_set, 10 /* TODO */,
@@ -103,9 +103,13 @@ main(int argc, char **argv)
 			gerror->message);
 		exit(1);
 	    }
-	    printf("%s's raw availability stored at:\n");
-	    for ( i = 0; i < raw_availabilities->len; i++ )
-		printf("%s\n", g_ptr_array_index(raw_availabilities, i));
+	    printf("%s's raw availability stored at:\n", argv[1]);
+	    for ( i = 0; i < raw_availabilities->len; i++ ) {
+		if ( !g_ptr_array_index(raw_availabilities, i) )
+		    printf("No Answer\n");
+		else
+		    printf("%s\n", g_ptr_array_index(raw_availabilities, i));
+	    }
 	}
     }
 
