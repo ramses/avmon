@@ -1,8 +1,90 @@
 AVMON
 ============
+The AVMON library allows the user to create a distributed
+availability-monitoring overlay. Its design makes the resulting overlay robust
+to selfish nodes that want to report higher than real availability. It is also
+robust to nodes that collude to try to alter their reported availability, so
+that it is reported to be higher than real. 
 
-mini-monitor
-============
+A node can be a computer host or any process running in a computer. The AVMON
+node simply needs a public global identifier. The current implementation
+supports IP number plus Port number as global identifier.
 
-mini-query
-============
+To prevent a node from reporting higher than real availability, self-reporting
+of availability is not used. Instead, a set of monitors for each node is
+selected following a distributed algorithm. These monitors are chosen randomly
+from among all the participating nodes, but in a consistent way. Consistency in
+the selection is important, because it allows recording of long-term
+availability.
+
+To learn the availability of a node, the system asks that node who its monitors
+are, and then each monitor is individually queried. Alternatively, if the node
+is offline, and the list of its monitors isn't currently known, we can learn
+who the monitors are by asking an online cache (this feature is currently being
+implemented).
+
+The monitors mentioned above cannot be arbitrary colluders of the target node.
+The monitor selection algorithm is based on a function which is known by all
+the nodes.  Thus, anyone in the system can verify that node A is indeed the
+monitor of node B.  In other words, if node B says that node A is one of its
+monitors, we can verify if this is true or false, to avoid false availability
+reports.
+
+AVMON gives its users the liberty to specify how to store the availability at
+the monitor, and how to report the availability when answering a query.
+(Currently, only the defaults are supported, which are raw storage, and raw
+reporting).
+
+AVMON can be used by any application that needs light-weight, scalable,
+availability-monitoring, in small- or large-scale distributed systems. Some
+examples: P2P/Grid-node availability prediction; availability monitor for
+availability-based replica-placement algorithms in distributed file-systems;
+process-liveliness monitoring in concurrent applications; availability-based
+resource allocation in clusters or P2P systems; availability-based user-credit
+allocation in P2P systems.
+
+To learn all the details of the design, analysis, and experimental results,
+please read the papers available at the website http://avmon.sf.net.
+
+REQUIREMENTS:
+=============
+
+As of now, it requires Linux with GLib-2.0 and OpenSSL libraries (which are
+standard part of most Linux distributions).
+
+Support for Win and Mac platforms is planned.
+
+INSTALLATION:
+=============
+
+See file INSTALL.
+
+HOW TO USE:
+===========
+
+To create an AVMON application #include <avmon/avmon.h>. This header file is
+well documented and the calls are easy to understand.
+
+Under mini/ we provide two useful "mini" applications: mini-monitor and
+mini-query.  With mini-monitor you can create an AVMON overlay that will do raw
+availability-monitoring.  The availability of the nodes in the overlay can be
+queried with mini-query, which also allows other AVMON-related properties to be
+queried. They are not complex, so their source-code is an easy way to learn how
+to take advantage of the AVMON library.
+
+I'm currently working on more documentation :-)
+
+COPYING:
+========
+
+The AVMON library is under the LGPLv3. See file COPYING.LESSER.
+
+The applications mini-monitor and mini-query are under the GPLv3. See file
+COPYING.
+
+
+WEBSITE:
+========
+(main) http://avmon.sf.net
+
+(development) http://sf.net/projects/avmon
