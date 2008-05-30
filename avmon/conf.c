@@ -21,7 +21,7 @@
 /**
  * \file conf.c
  * \author Ramses Morales
- * \version $Id: conf.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: conf.c,v 1.2 2008/05/30 01:21:59 ramses Exp $
  */
 
 #include <sys/socket.h>
@@ -72,6 +72,18 @@ struct _Conf {
     int monitoring_period;
     char *default_av_output_prefix;
 };
+
+void
+conf_free(Conf *conf)
+{
+    g_assert( conf != NULL );
+
+    g_free(conf->introducer_name);
+    g_free(conf->host_ip);
+    g_free(conf->default_av_output_prefix);
+
+    g_free(conf);
+}
 
 Conf *
 conf_load(const char *fname, GError **gerror)

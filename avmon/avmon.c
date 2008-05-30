@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.7 2008/05/30 00:04:44 ramses Exp $
+ * \version $Id: avmon.c,v 1.8 2008/05/30 01:21:59 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -306,6 +306,12 @@ ps_to_array(AVMONNode *node)
     return array;
 }
 
+static void
+_ps_destroy(gpointer _peer)
+{
+    peer_free((AVMONPeer *) _peer);
+}
+
 static gboolean
 ts_add(AVMONNode *node, AVMONPeer *peer)
 {
@@ -341,6 +347,12 @@ static inline int
 ts_size(AVMONNode *node)
 {
     return g_hash_table_size(node->ts);
+}
+
+static void
+_ts_destroy(gpointer _peer)
+{
+    peer_free((AVMONPeer *) _peer);
 }
 
 static void
@@ -408,12 +420,20 @@ avmon_node_free(AVMONNode *node)
 	close(node->monitoring_pipe[1]);
     }
 
-    g_free(node);
+    g_free(node->ip_c);
+    g_free(node->port_c);
+    g_free(node->key);
+    g_free(node->default_av_output_prefix);
+    g_rand_free(node->grand);
 
-    node = NULL;
-#ifdef DEBUG
-    g_debug("node free");
-#endif
+    g_hash_table_destroy(node->cv);
+
+    conf_free(node->conf);
+
+    g_hash_table_destroy(node->ps);
+    g_hash_table_destroy(node->ts);
+
+    g_free(node);
 }
 
 static AVMONNode *
@@ -435,8 +455,8 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
     node->avmon_av_output_func = avmon_default_av_output_function;
     node->default_av_output_prefix = conf_get_default_av_output_prefix(conf);
 
-    node->ps = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
-    node->ts = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, NULL);
+    node->ps = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, _ps_destroy);
+    node->ts = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, _ts_destroy);
 
     node->CVS = 4 * ((int) pow((double) N, 0.25));
 
@@ -449,7 +469,7 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
 
     node->ip_c = conf_get_host_ip(conf);
     if ( !node->ip_c ) {
-	node->ip_c = net_my_ip(gerror);
+	node->ip_c = g_strdup(net_my_ip(gerror));
 	if ( *gerror )
 	    g_error("%s\nPlease use host_ip option in configuration file",
 		    (*gerror)->message); //aborts
@@ -852,8 +872,8 @@ static gboolean
 do_add_joiner(AVMONNode *node, const char *joiner_ip, uint16_t joiner_port)
 {
     char *joiner_port_c = g_strdup_printf("%u", joiner_port);
-    
-    joiner_port_c = g_strdup_printf("%u", joiner_port);
+
+    // blah
     if ( !cv_lookup(node, joiner_ip, joiner_port_c) )
 	cv_add(node, peer_new(joiner_ip, joiner_port_c));
     g_free(joiner_port_c);
@@ -1055,6 +1075,8 @@ main_loop(void *_node)
 	    gerror = NULL;
 	    continue;
 	}
+	freeaddrinfo(peer_info);
+	peer_info = NULL;
 	
 	if ( msg_send_cv_fetch(sockfd, &gerror) ) {
 	    fprintf(stderr, "main_loop: %s\n", gerror->message);

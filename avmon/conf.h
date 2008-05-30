@@ -21,7 +21,7 @@
 /**
  * \file conf.h
  * \author Ramses Morales
- * \version $Id: conf.h,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: conf.h,v 1.2 2008/05/30 01:21:59 ramses Exp $
  */
 
 #ifndef __AVMON_CONF_H__
@@ -37,7 +37,7 @@ AVMON_BEGIN_DECLS
 typedef struct _Conf Conf;
 
 Conf *conf_load(const char *fname, GError **gerror);
-
+void conf_free(Conf *conf);
 int conf_get_listener_tcp_udp_port(Conf *conf);
 char *conf_get_introducer_name(Conf *conf); //remember to free returned string
 int conf_get_introducer_port(Conf *conf);
