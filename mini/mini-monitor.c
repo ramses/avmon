@@ -19,7 +19,7 @@
 /**
  * \file mini-monitor.c
  * \author Ramses Morales
- * \version $Id: mini-monitor.c,v 1.3 2008/05/31 00:23:38 ramses Exp $
+ * \version $Id: mini-monitor.c,v 1.4 2008/05/31 05:07:59 ramses Exp $
  */
 
 #include <stdio.h>
@@ -281,19 +281,24 @@ main(int argc, char **argv)
 
     node = NULL;
 
-    context = g_option_context_new("-- simple avmon app");
+    context = g_option_context_new("- Simple p2p availability-monitoring "
+				   "application built with AVMON.");
+    g_option_context_set_summary(context, "Copyright (C) 2007, 2008 Ramses Morales"
+				 "\nhttp://avmon.sf.net");
     g_option_context_add_main_entries(context, entries, NULL);
     g_option_context_set_help_enabled(context, TRUE);
     g_option_context_parse(context, &argc, &argv, &gerror);
     if ( gerror ) {
-	fprintf(stderr, "%s\n", gerror->message);
+	fprintf(stderr, "%s\n\n%s", gerror->message,
+		g_option_context_get_help(context, TRUE, NULL));
+	exit(1);
+    }
+    if ( !conf ) {
+	fprintf(stderr, "Please specify configuration filename.\n\n%s",
+		g_option_context_get_help(context, TRUE, NULL));
 	exit(1);
     }
     g_option_context_free(context);
-    if ( !conf ) {
-	fprintf(stderr, "Please specify configuration filename\n");
-	exit(1);
-    }
 
     configuration();
 
