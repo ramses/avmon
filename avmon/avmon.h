@@ -21,7 +21,7 @@
 /**
  * \file avmon.h
  * \author Ramses Morales
- * \version $Id: avmon.h,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: avmon.h,v 1.2 2008/05/31 00:23:38 ramses Exp $
  */
  
 #ifndef __AVMON_H__
@@ -37,6 +37,7 @@ AVMON_BEGIN_DECLS
 #define AVMON_ERROR_NODE   3
 #define AVMON_ERROR_GET_PS 4
 #define AVMON_ERROR_STOP   5
+#define AVMON_ERROR_INTRODUCER_CLOSED 6
 
 #define AVMON_INTRODUCER_NONE "none"
 

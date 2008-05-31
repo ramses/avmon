@@ -21,7 +21,7 @@
 /**
  * \file net.c
  * \author Ramses Morales
- * \version $Id: net.c,v 1.2 2008/05/23 22:50:30 ramses Exp $
+ * \version $Id: net.c,v 1.3 2008/05/31 00:23:38 ramses Exp $
  */
 
 #include <stdio.h>
@@ -107,7 +107,8 @@ net_write(int fd, const void *buff, size_t count, GError **gerror)
     
     while ( count ) {
 	if ( (bytes_written = write(fd, buff_pointer, count)) == -1 ) {
-	    util_set_error_errno(gerror, NET_ERROR, NET_ERROR_WRITE, "net_write");
+	    util_set_error_errno(gerror, NET_ERROR, errno == EPIPE ? 
+				 NET_ERROR_SIGPIPE:NET_ERROR_WRITE, "net_write");
 	    return -1;
 	} else {
 	    count -= bytes_written;

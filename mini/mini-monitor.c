@@ -19,7 +19,7 @@
 /**
  * \file mini-monitor.c
  * \author Ramses Morales
- * \version $Id: mini-monitor.c,v 1.2 2008/05/27 17:26:08 ramses Exp $
+ * \version $Id: mini-monitor.c,v 1.3 2008/05/31 00:23:38 ramses Exp $
  */
 
 #include <stdio.h>
@@ -127,7 +127,10 @@ do_start(void)
 	else
 	    fprintf(stderr, "Unknown reason\n");
 	fflush(log);
-	exit(1);
+	if ( g_error_matches(gerror, AVMON_ERROR, AVMON_ERROR_INTRODUCER_CLOSED) )
+	    g_error_free(gerror);
+	else
+	    exit(1);
     }
 }
 
@@ -141,6 +144,7 @@ do_stop(void)
 
     avmon_stop(node, &gerror);
     node = NULL;
+
     if ( gerror ) {
 	fprintf(stderr, "Error stoping AVMON: %s\n", gerror->message);
 	exit(1);

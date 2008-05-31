@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.8 2008/05/30 01:21:59 ramses Exp $
+ * \version $Id: avmon.c,v 1.9 2008/05/31 00:23:38 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1317,6 +1317,11 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 exit_with_error:
     if ( node )
 	avmon_node_free(node);
+    if ( g_error_matches(*gerror, NET_ERROR, NET_ERROR_SIGPIPE) ) {
+	g_error_free(*gerror);
+	g_set_error(gerror, AVMON_ERROR, AVMON_ERROR_INTRODUCER_CLOSED,
+		    "introducer closed the connection");
+    }
 
     return NULL;
 }

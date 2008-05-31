@@ -21,7 +21,7 @@
 /**
  * \file net.h
  * \author Ramses Morales
- * \version $Id: net.h,v 1.2 2008/05/23 22:50:30 ramses Exp $
+ * \version $Id: net.h,v 1.3 2008/05/31 00:23:38 ramses Exp $
  */
 
 #ifndef __AVMON_NET_H__
@@ -32,13 +32,14 @@
 
 AVMON_BEGIN_DECLS
 
-#define NET_ERROR        net_error_quark()
-#define NET_ERROR_GEN    1
-#define NET_ERROR_ZERO   2
-#define NET_ERROR_EINTR  3
-#define NET_ERROR_EAGAIN 4
-#define NET_ERROR_WRITE  5
-#define NET_ERROR_CV     6
+#define NET_ERROR         net_error_quark()
+#define NET_ERROR_GEN     1
+#define NET_ERROR_ZERO    2
+#define NET_ERROR_EINTR   3
+#define NET_ERROR_EAGAIN  4
+#define NET_ERROR_WRITE   5
+#define NET_ERROR_CV      6
+#define NET_ERROR_SIGPIPE 7
 
 #define NET_IP_CHAR_SIZE 16
 
