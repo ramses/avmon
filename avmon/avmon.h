@@ -21,7 +21,7 @@
 /**
  * \file avmon.h
  * \author Ramses Morales
- * \version $Id: avmon.h,v 1.2 2008/05/31 00:23:38 ramses Exp $
+ * \version $Id: avmon.h,v 1.3 2008/05/31 18:33:03 ramses Exp $
  */
  
 #ifndef __AVMON_H__
@@ -38,6 +38,7 @@ AVMON_BEGIN_DECLS
 #define AVMON_ERROR_GET_PS 4
 #define AVMON_ERROR_STOP   5
 #define AVMON_ERROR_INTRODUCER_CLOSED 6
+#define AVMON_ERROR_GET_TS 7
 
 #define AVMON_INTRODUCER_NONE "none"
 
@@ -97,6 +98,18 @@ char *avmon_peer_get_port(const AVMONPeer *peer);
  */
 GPtrArray *avmon_get_ping_set(const char *target, const char *target_port,
 			      GError **gerror);
+
+/**
+ * Ask an AVMON node for its Target Set.
+ *
+ * \param[in] monitor Host name or ip of avmon node.
+ * \param[in] monitor_port AVMON port of avmon node.
+ * \param[out] gerror If something goes wrong, *gerror will be non-NULL.
+ * \return Returns GPtrArray populated with AVMONPeer. Can be empty. 
+ * NULL only if error. Free array and elements after use.
+ */
+GPtrArray *avmon_get_target_set(const char *monitor, const char *monitor_port,
+				GError **gerror);
 
 /**
  * Use this function to request a number of monitors to provide the raw

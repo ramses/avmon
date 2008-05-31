@@ -21,7 +21,7 @@
 /**
  * \file listener.c
  * \author Ramses Morales
- * \version $Id: listener.c,v 1.5 2008/05/29 22:12:45 ramses Exp $
+ * \version $Id: listener.c,v 1.6 2008/05/31 18:32:47 ramses Exp $
  */
 
 #include <unistd.h>
@@ -150,6 +150,24 @@ handle_get_ps(void *args)
     
     util_counter_dec(pargs->al->tcp_thread_count);
 
+    g_free(args);
+    
+    pthread_exit(NULL);
+}
+
+extern void avmon_receive_get_ts(AVMONNode *node, int socketfd);
+
+static void *
+handle_get_ts(void *args)
+{
+    PacketHandlerArgs *pargs = (PacketHandlerArgs *) args;
+    
+    pthread_detach(pthread_self());
+    
+    avmon_receive_get_ts(pargs->al->node, pargs->connection_fd);
+    
+    util_counter_dec(pargs->al->tcp_thread_count);
+    
     g_free(args);
     
     pthread_exit(NULL);
@@ -303,11 +321,12 @@ static hp datagram_handlers[6] = {
     handle_forward
 };
 
-static hp packet_handlers[4] = {
+static hp packet_handlers[5] = {
     handle_join,
     handle_cv_fetch,
     handle_get_ps,
-    handle_get_raw_availability
+    handle_get_raw_availability,
+    handle_get_ts
 };
 
 static void *

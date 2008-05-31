@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.9 2008/05/31 00:23:38 ramses Exp $
+ * \version $Id: avmon.c,v 1.10 2008/05/31 18:33:03 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -353,6 +353,18 @@ static void
 _ts_destroy(gpointer _peer)
 {
     peer_free((AVMONPeer *) _peer);
+}
+
+static GPtrArray *
+ts_to_array(AVMONNode *node)
+{
+    GPtrArray *array = NULL;
+    
+    pthread_mutex_lock(&node->mutex_ts);
+    array = util_g_hash_table_to_array(node->ts);
+    pthread_mutex_unlock(&node->mutex_ts);
+
+    return array;
 }
 
 static void
@@ -1573,4 +1585,67 @@ bye:
 	}
 	g_ptr_array_free(arr, TRUE);
     }
+}
+
+// ===
+static void
+_avmon_get_target_set(const char *ip, const char *port, void *_array)
+{
+    g_ptr_array_add((GPtrArray *) _array, peer_new(ip, port));
+}
+
+GPtrArray *
+avmon_get_target_set(const char *monitor, const char *monitor_port, GError **gerror)
+{
+    g_assert(monitor != NULL);
+    g_assert(monitor_port != NULL);
+
+    GPtrArray *array = NULL, *ip_port_array;
+    int socketfd;
+    struct addrinfo *ai = net_char_to_addrinfo(monitor, monitor_port, gerror);
+    if ( !ai )
+	return NULL;
+    
+    if ( (socketfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))
+	 == -1 ) {
+	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_GET_TS, 
+			     "couldn't create socket");
+	socketfd = 0;
+	goto bye;
+    }
+    
+    if ( net_connect_nb(socketfd, ai->ai_addr, ai->ai_addrlen, 5 /*TODO*/, 0, gerror) ) {
+	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_GET_TS,
+			     "couldn't connect");
+	goto bye;
+    }
+    
+    if ( msg_send_get_ts(socketfd, gerror) )
+	goto bye;
+
+    if ( msg_read_get_ts_reply(socketfd, gerror) )
+	goto bye;
+
+    if ( !(ip_port_array = msg_read_ts(socketfd, gerror)) )
+	goto bye;
+    
+    array = g_ptr_array_new();
+    process_ip_port_array(ip_port_array, TRUE, _avmon_get_target_set, array);
+
+bye:
+    if ( socketfd )
+	close(socketfd);
+    if ( ai )
+	freeaddrinfo(ai);
+
+    return array;
+}
+
+void
+avmon_receive_get_ts(AVMONNode *node, int socketfd)
+{
+    GError *gerror = NULL;
+    GPtrArray *ts_array = ts_to_array(node);
+
+    msg_write_get_ts_reply(socketfd, ts_array, &gerror);
 }

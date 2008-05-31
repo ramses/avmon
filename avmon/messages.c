@@ -21,7 +21,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.4 2008/05/29 23:48:10 ramses Exp $
+ * \version $Id: messages.c,v 1.5 2008/05/31 18:32:33 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -761,4 +761,46 @@ msg_read_type(int socketfd, uint8_t *buff, GError **gerror)
     }
 
     return 0;
+}
+
+int
+msg_send_get_ts(int socketfd, GError **gerror)
+{
+    uint8_t msg[MSG_GET_TS_SIZE];
+
+    memcpy(msg, MSG_HEAD, MSG_HEAD_SIZE);
+    msg[MSG_HEAD_SIZE] = MSG_GET_TS;
+
+    return net_write(socketfd, msg, MSG_GET_TS_SIZE, gerror);
+}
+
+int
+msg_read_get_ts_reply(int socketfd, GError **gerror)
+{
+    uint8_t octet;
+    if ( net_read_byte(socketfd, &octet, gerror) )
+	return 1;
+    if ( octet != MSG_GET_TS_REPLY ) {
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_GET_TS_REPLY,
+		    "expecting %u, received %u", MSG_GET_TS_REPLY, octet);
+	return 1;
+    }
+    return 0;
+}
+
+GPtrArray *
+msg_read_ts(int socketfd, GError **gerror)
+{
+    return msg_extract_ids(socketfd, gerror);
+}
+
+int
+msg_write_get_ts_reply(int socketfd, const GPtrArray *ts_array, GError **gerror)
+{
+    MsgIPPortList *mipl = msg_ip_port_list_reply(MSG_GET_TS_REPLY, ts_array);
+    int res = net_write(socketfd, mipl->msg, mipl->size, gerror) ? 1 : 0;
+    
+    msg_ip_port_list_free(mipl);
+    
+    return res;
 }

@@ -21,7 +21,7 @@
 /**
  * \file messages.h
  * \author Ramses Morales
- * \version $Id: messages.h,v 1.3 2008/05/29 04:21:41 ramses Exp $
+ * \version $Id: messages.h,v 1.4 2008/05/31 18:32:33 ramses Exp $
  */
 
 #ifndef __AVMON_MESSAGES_H__
@@ -44,6 +44,7 @@ AVMON_BEGIN_DECLS
 #define MSG_ERROR_GET_RAW_AVAILABILITY_REPLY     8
 #define MSG_ERROR_IP                             9
 #define MSG_ERROR_INVALID_PACKET_TYPE            10
+#define MSG_ERROR_NOT_GET_TS_REPLY               11
 
 enum MsgDatagramTypes {
     MSG_PING           = 0X01,
@@ -59,15 +60,17 @@ enum MsgPacketType {
     MSG_JOIN                 = 0X01,
     MSG_CV_FETCH             = 0X02,
     MSG_GET_PS               = 0X03,
-    MSG_GET_RAW_AVAILABILITY = 0X04
+    MSG_GET_RAW_AVAILABILITY = 0X04,
+    MSG_GET_TS               = 0X05
 };
 
 enum MsgPacketReplyType {
-    MSG_JOIN_REPLY                 = 0X05,
-    MSG_FETCH_REPLY                = 0X06,
-    MSG_GET_PS_REPLY               = 0X07,
-    MSG_GET_RAW_AVAILABILITY_REPLY = 0X08,
-    MSG_NOT_A_PACKET               = 0X09
+    MSG_JOIN_REPLY                 = 0X06,
+    MSG_FETCH_REPLY                = 0X07,
+    MSG_GET_PS_REPLY               = 0X08,
+    MSG_GET_RAW_AVAILABILITY_REPLY = 0X09,
+    MSG_GET_TS_REPLY               = 0X0A,
+    MSG_NOT_A_PACKET               = 0X0B
 };
 
 extern const char *MSG_HEAD;
@@ -80,6 +83,7 @@ extern const char *MSG_HEAD;
 #define MSG_PONG_SIZE     (8+3)
 #define MSG_CV_FETCH_SIZE (8+1)
 #define MSG_GET_PS_SIZE   (8+1)
+#define MSG_GET_TS_SIZE   (8+1)
 
 #define MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE (1 + 1 + 4)
     
@@ -131,6 +135,10 @@ int msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 					     int timeout, GError **gerror);
 GPtrArray *msg_read_target(int socketfd, GError **gerror);
 int msg_write_get_raw_availability_reply(int socketfd, const char *filename, GError **gerror);
+int msg_send_get_ts(int socketfd, GError **gerror);
+int msg_read_get_ts_reply(int socketfd, GError **gerror);
+GPtrArray *msg_read_ts(int socketfd, GError **gerror);
+int msg_write_get_ts_reply(int socketfd, const GPtrArray *ts_array, GError **gerror);
 
 AVMON_END_DECLS
 

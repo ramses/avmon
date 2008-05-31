@@ -19,7 +19,7 @@
 /**
  * \file mini-query.c
  * \author Ramses Morales
- * \version $Id: mini-query.c,v 1.3 2008/05/31 05:07:59 ramses Exp $
+ * \version $Id: mini-query.c,v 1.4 2008/05/31 18:33:29 ramses Exp $
  */
 
 #include <stdio.h>
@@ -30,6 +30,7 @@
 #include "net.h"
 
 static gboolean query_ping_set = FALSE;
+static gboolean query_target_set = FALSE;
 static gboolean query_raw_av = FALSE;
 
 static char *target_host = NULL;
@@ -42,11 +43,13 @@ main(int argc, char **argv)
     AVMONPeer *peer = NULL;
     char **target = NULL;
     GError *gerror = NULL;
-    GPtrArray *ping_set = NULL, *raw_availabilities = NULL;
+    GPtrArray *set = NULL, *raw_availabilities = NULL;
     GOptionContext *context;
     GOptionEntry entries[] = {
 	{"ping-set", 'p', 0, G_OPTION_ARG_NONE, &query_ping_set,
 	 "Query ping set", NULL},
+	{"target-set", 't', 0, G_OPTION_ARG_NONE, &query_target_set,
+	 "Query target set", NULL},
 	{"raw-av", 'r', 0, G_OPTION_ARG_NONE, &query_raw_av,
 	 "Query raw availability", NULL},
 	{ NULL }
@@ -79,7 +82,7 @@ main(int argc, char **argv)
 
     if ( query_ping_set || query_raw_av ) {
 	printf("Asking %s for its ping set... \n", argv[1]);
-	if ( !(ping_set = avmon_get_ping_set(target_host, target_port, &gerror)) ) {
+	if ( !(set = avmon_get_ping_set(target_host, target_port, &gerror)) ) {
 	    fprintf(stderr, "Could not query ping set: %s\n", gerror->message);
 	    exit(1);
 	}
@@ -87,18 +90,18 @@ main(int argc, char **argv)
 
     if ( query_ping_set ) {
 	printf("%s's ping set:\n", argv[1]);
-	for ( i = 0; i < ping_set->len; i++ ) {
-	    peer = g_ptr_array_index(ping_set, i);
+	for ( i = 0; i < set->len; i++ ) {
+	    peer = g_ptr_array_index(set, i);
 	    printf("%s:%s\n", avmon_peer_get_ip(peer), avmon_peer_get_port(peer));
 	}
     }
 
     if ( query_raw_av ) {
-	if ( !ping_set->len ) {
+	if ( !set->len ) {
 	    printf("Can't query availability. %s's ping set is empty\n", argv[1]);
 	} else {
 	    if ( !(raw_availabilities = 
-		   avmon_get_raw_availability(ping_set, 10 /* TODO */,
+		   avmon_get_raw_availability(set, 10 /* TODO */,
 					      target_host, target_port,
 					      &gerror)) ) {
 		fprintf(stderr, "Could not query raw availability: %s\n",
@@ -112,6 +115,20 @@ main(int argc, char **argv)
 		else
 		    printf("%s\n", g_ptr_array_index(raw_availabilities, i));
 	    }
+	}
+    }
+
+    if ( query_target_set ) {
+	printf("Asking %s for its target set... \n", argv[1]);
+	if ( !(set = avmon_get_target_set(target_host, target_port, &gerror)) ) {
+	    fprintf(stderr, "Could not query target set: %s\n", gerror->message);
+	    exit(1);
+	}
+	
+	printf("%s's target set:\n", argv[1]);
+	for ( i = 0; i < set->len; i++ ) {
+	    peer = g_ptr_array_index(set, i);
+	    printf("%s:%s\n", avmon_peer_get_ip(peer), avmon_peer_get_port(peer));
 	}
     }
 
