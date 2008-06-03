@@ -21,7 +21,7 @@
 /**
  * \file util.c
  * \author Ramses Morales
- * \version $Id: util.c,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: util.c,v 1.2 2008/06/03 02:11:15 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -212,4 +212,16 @@ bye:
 	close(dest_fd);
     
     return res;
+}
+
+void
+util_eliminate_newline(char *s)
+{
+    char *p = NULL;
+
+    g_assert( s != NULL );
+
+    p = strchr(s, '\n');
+    if ( p )
+        *p = '\0';
 }

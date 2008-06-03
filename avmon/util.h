@@ -21,7 +21,7 @@
 /**
  * \file util.h
  * \author Ramses Morales
- * \version $Id: util.h,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version $Id: util.h,v 1.2 2008/06/03 02:11:15 ramses Exp $
  */
 
 #ifndef __AVMON_UTIL_H__
@@ -61,6 +61,8 @@ GPtrArray *util_g_hash_table_to_array(GHashTable *table);
  */
 guint32 util_fcopy(const char *src_filename, const char *dest_filename, guint32 bytes,
 		   gboolean tail, GError **gerror);
+
+void util_eliminate_newline(char *s);
 
 AVMON_END_DECLS
 
