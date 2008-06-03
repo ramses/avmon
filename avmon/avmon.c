@@ -21,7 +21,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.10 2008/05/31 18:33:03 ramses Exp $
+ * \version $Id: avmon.c,v 1.11 2008/06/03 02:11:41 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -36,6 +36,8 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <math.h>
+#include <sys/stat.h>
+#include <pwd.h>
 
 #include <openssl/evp.h>
 
@@ -80,6 +82,7 @@ struct _AVMONPeer {
     FILE *default_output;
     char *default_output_name;
     gboolean peer_cv; //flag to avoid leaks during shuffle
+    GTimeVal last_mon_ping_answered;
 };
 
 struct _AVMONNode {
@@ -228,6 +231,7 @@ peer_new(const char *ip, const char *port)
     p->default_output = NULL;
     p->default_output_name = NULL;
     p->peer_cv = FALSE;
+    p->last_mon_ping_answered.tv_sec = 0;
     return p;
 }
 
@@ -1235,6 +1239,103 @@ bye:
     return result;
 }
 
+#define CACHE_SEPARATOR "|"
+
+static void
+load_cached_sets(AVMONNode *node)
+{
+    struct passwd *spwd = NULL;
+    struct stat statbuff;
+    char *cache_dir = NULL, *ps_cache_name = NULL, *ts_cache_name = NULL;
+    char *line = NULL, **split = NULL;
+    GIOChannel *ps_cache = NULL, *ts_cache = NULL;
+    GIOStatus status;
+    GError *gerror = NULL;
+    AVMONPeer *peer = NULL;
+    
+    spwd = getpwuid(getuid());
+
+    cache_dir = g_strdup_printf("%s/.avmon/%s_%s/", spwd->pw_dir, node->ip_c,
+				node->port_c);
+    if ( !stat(cache_dir, &statbuff) ) {
+	if ( !S_ISDIR(statbuff.st_mode) ) {
+	    g_warning("set-cache not used. %s is not a directory", cache_dir);
+	    goto bye;
+	}
+    } else if ( errno == ENOENT ) {
+	if ( mkdir(cache_dir, S_IRWXU) ) {
+	    g_warning("couldn't create set-cache directory: %s", strerror(errno));
+	    goto bye;
+	}
+    }
+
+    ps_cache_name = g_strconcat(cache_dir, "ps_cache.txt", NULL);
+    ts_cache_name = g_strconcat(cache_dir, "ts_cache.txt", NULL);
+
+    if ( !(ps_cache = g_io_channel_new_file(ps_cache_name, "r", &gerror)) ) {
+	if ( !g_error_matches(gerror, G_FILE_ERROR, G_FILE_ERROR_NOENT) )
+	    g_warning("couldn't open ps-cache: %s", gerror->message);
+	g_error_free(gerror);
+	gerror = NULL;
+    } else {
+	for ( ; ; ) {
+	    status = g_io_channel_read_line(ps_cache, &line, NULL, NULL, &gerror);
+	    if ( gerror ) {
+		g_warning("error reading ps-cache: %s", gerror->message);
+		g_error_free(gerror);
+		gerror = NULL;
+		break;
+	    }
+	    if ( status != G_IO_STATUS_NORMAL )
+		break;
+		
+	    split = g_strsplit(line, CACHE_SEPARATOR, -1);
+	    util_eliminate_newline(split[1]);
+	    ps_add(node, peer_new(split[0], split[1])); //TODO: validate ip and port
+
+	    g_strfreev(split);
+	}
+    }
+
+    if ( !(ts_cache = g_io_channel_new_file(ts_cache_name, "r", &gerror)) ) {
+	if ( !g_error_matches(gerror, G_FILE_ERROR, G_FILE_ERROR_NOENT) )
+	    g_warning("couldn't open ts-cache: %s", gerror->message);
+	g_error_free(gerror);
+	gerror = NULL;
+    } else {
+	for ( ; ; ) {
+	    status = g_io_channel_read_line(ts_cache, &line, NULL, NULL, &gerror);
+	    if ( gerror ) {
+		g_warning("error reading ts-cache: %s", gerror->message);
+		g_error_free(gerror);
+		gerror = NULL;
+		break;
+	    }
+	    if ( status != G_IO_STATUS_NORMAL )
+		break;
+		
+	    split = g_strsplit(line, CACHE_SEPARATOR, -1);
+	    peer = peer_new(split[0], split[1]);
+	    peer->last_mon_ping_answered.tv_sec = g_strtod(split[2], NULL);
+	    ts_add(node, peer); //TODO: validate ip and port
+
+	    g_strfreev(split);
+	}
+    }
+
+bye:    
+    if ( cache_dir )
+	g_free(cache_dir);
+    if ( ps_cache_name )
+	g_free(ps_cache_name);
+    if ( ts_cache_name )
+	g_free(ts_cache_name);
+    if ( ps_cache )
+	g_io_channel_close(ps_cache);
+    if ( ts_cache )
+	g_io_channel_close(ts_cache);
+}
+
 /**
  * Use to create an AVMON node.
  *
@@ -1311,6 +1412,8 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 	}
 	node->join_status = JOIN_STATUS_IN;
     }
+
+    load_cached_sets(node);
 
     //main protocol loop
 #ifdef DEBUG
