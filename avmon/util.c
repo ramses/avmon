@@ -16,12 +16,18 @@
  *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with AVMON.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ *  Neither the names of Distributed Protocols Research Group, University of
+ *  Illinois at Urbana-Champaign, nor the names of its contributors may be used
+ *  to endorse or promote products derived from this Software without specific
+ *  prior written permission.
  */
 
 /**
  * \file util.c
  * \author Ramses Morales
- * \version $Id: util.c,v 1.2 2008/06/03 02:11:15 ramses Exp $
+ * \version $Id: util.c,v 1.3 2008/06/04 16:41:06 ramses Exp $
  */
 
 #include <stdlib.h>

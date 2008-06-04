@@ -14,12 +14,18 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ *  Neither the names of Distributed Protocols Research Group, University of
+ *  Illinois at Urbana-Champaign, nor the names of its contributors may be used
+ *  to endorse or promote products derived from this Software without specific
+ *  prior written permission.
  */
 
 /**
  * \file mini-monitor.c
  * \author Ramses Morales
- * \version $Id: mini-monitor.c,v 1.4 2008/05/31 05:07:59 ramses Exp $
+ * \version $Id: mini-monitor.c,v 1.5 2008/06/04 16:41:07 ramses Exp $
  */
 
 #include <stdio.h>

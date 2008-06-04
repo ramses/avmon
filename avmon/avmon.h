@@ -16,12 +16,18 @@
  *
  *  You should have received a copy of the GNU Lesser General Public License
  *  along with AVMON.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ *
+ *  Neither the names of Distributed Protocols Research Group, University of
+ *  Illinois at Urbana-Champaign, nor the names of its contributors may be used
+ *  to endorse or promote products derived from this Software without specific
+ *  prior written permission.
  */
 
 /**
  * \file avmon.h
  * \author Ramses Morales
- * \version $Id: avmon.h,v 1.3 2008/05/31 18:33:03 ramses Exp $
+ * \version $Id: avmon.h,v 1.4 2008/06/04 16:41:06 ramses Exp $
  */
  
 #ifndef __AVMON_H__
