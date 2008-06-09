@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.12 2008/06/04 16:41:06 ramses Exp $
+ * \version $Id: avmon.c,v 1.13 2008/06/09 18:13:44 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -89,6 +89,9 @@ struct _AVMONPeer {
     char *default_output_name;
     gboolean peer_cv; //flag to avoid leaks during shuffle
     GTimeVal last_mon_ping_answered;
+    GTimeVal last_mon_ping;
+    GTimeVal first_session_ping;
+    glong unresponsive;
 };
 
 struct _AVMONNode {
@@ -133,6 +136,10 @@ struct _AVMONNode {
     
     GPtrArray *peer_trash;
     time_t peer_trash_last_collection;
+
+    gboolean enable_forgetful_pinging;
+    gboolean session_first_ts_ping;
+    glong unresponsive_threshold;
 };
 
 static inline int
@@ -238,6 +245,12 @@ peer_new(const char *ip, const char *port)
     p->default_output_name = NULL;
     p->peer_cv = FALSE;
     p->last_mon_ping_answered.tv_sec = 0;
+    p->last_mon_ping_answered.tv_usec = 0;
+    p->last_mon_ping.tv_sec = 0;
+    p->last_mon_ping.tv_usec = 0;
+    p->first_session_ping.tv_sec = 0;
+    p->first_session_ping.tv_usec = 0;
+    p->unresponsive = 0;
     return p;
 }
 
@@ -407,7 +420,47 @@ avmon_default_av_output_function(AVMONNode *node, AVMONPeer *peer)
 static void
 avmon_default_monitor_reply(AVMONNode *node, AVMONPeer *peer)
 {
+    if ( node->enable_forgetful_pinging ) {
+	g_get_current_time(&peer->last_mon_ping_answered);
+	if ( peer->unresponsive ) {
+	    peer->unresponsive = 0;
+	    peer->first_session_ping.tv_sec = peer->last_mon_ping.tv_sec;
+	    peer->first_session_ping.tv_usec = 0;
+	}
+    }
+
     node->avmon_av_output_func(node, peer);
+}
+
+static gboolean
+forgetful_ping_dec(AVMONNode *node, AVMONPeer *peer)
+{
+    double session_time;
+    GTimeVal tv;
+    
+    if ( peer->last_mon_ping.tv_sec == 0 )
+	return TRUE;
+
+    if ( peer->last_mon_ping.tv_sec < peer->last_mon_ping_answered.tv_sec )
+	return TRUE;
+    
+    g_get_current_time(&tv);
+    peer->unresponsive += tv.tv_sec - peer->last_mon_ping.tv_sec;
+    
+    if ( !(peer->unresponsive > node->unresponsive_threshold) )
+	return TRUE;
+    
+    if ( peer->last_mon_ping_answered.tv_sec == 0 )
+	return FALSE;
+    
+    session_time = (double) (peer->last_mon_ping_answered.tv_sec 
+			     - peer->first_session_ping.tv_sec);
+    if ( ( ( 1.0 /*TODO*/ * session_time)
+	   / (session_time + (double) peer->unresponsive) ) 
+	 > g_rand_double(node->grand) )
+	return FALSE;
+
+    return TRUE;
 }
 
 static void
@@ -416,7 +469,18 @@ _ts_foreach(gpointer _key, gpointer _peer, gpointer _node)
     AVMONPeer *peer = (AVMONPeer *) _peer;
     AVMONNode *node = (AVMONNode *) _node;
     
+    if ( node->enable_forgetful_pinging ) {
+	if ( !node->session_first_ts_ping )
+	    if ( !forgetful_ping_dec(node, peer) )
+		return;
+    }
+    
     node->avmon_func((AVMONNode *) _node, peer->ip, peer->port);
+    if ( node->enable_forgetful_pinging ) {
+	g_get_current_time(&peer->last_mon_ping);
+	if ( peer->first_session_ping.tv_sec == 0 )
+	    g_get_current_time(&peer->first_session_ping);
+    }
 }
 
 static void
@@ -425,6 +489,8 @@ ts_foreach(AVMONNode *node)
     pthread_mutex_lock(&node->mutex_ts);
     g_hash_table_foreach(node->ts, _ts_foreach, node);
     pthread_mutex_unlock(&node->mutex_ts);
+    
+    node->session_first_ts_ping = FALSE;
 }
 
 static void
@@ -540,6 +606,9 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
 
     node->peer_trash = g_ptr_array_new();
     node->peer_trash_last_collection = time(NULL);
+
+    node->enable_forgetful_pinging = conf_enable_forgetful_pinging(conf);
+    node->session_first_ts_ping = TRUE;
 
     return node;
 
@@ -731,19 +800,23 @@ avmon_receive_monitoring_pong(AVMONNode *node, const char *ip, const uint8_t *bu
     char *peer_port_c;
     if ( gerror ) {
 	//TODO: log
-	g_error_free(gerror);
-	return;
+	goto bye;
     }
 
     peer_port_c = g_strdup_printf("%d", peer_port);
     peer = ts_lookup(node, ip, peer_port_c);
-    g_free(peer_port_c);
     if ( !peer ) {
-	//TODO: log something
-	return;
+	g_warning("received monitoring pong from %s:%s. It is not in TS", ip,
+		  peer_port_c);
+	goto bye;
     }
 
     node->avmon_reply_func(node, peer);
+
+bye:
+    if ( gerror )
+	g_error_free(gerror);
+    g_free(peer_port_c);
 }
 
 void
@@ -973,6 +1046,8 @@ monitoring_loop(void *_node)
     fd_set rset;
     struct timeval tv;
     const int period = conf_get_monitoring_period(node->conf);
+    if ( node->enable_forgetful_pinging ) 
+	node->unresponsive_threshold = 3 * period; //TODO: conf?
 
     for ( ; ; ) {
 	FD_ZERO(&rset);
@@ -1323,6 +1398,7 @@ load_cached_sets(AVMONNode *node)
 	    split = g_strsplit(line, CACHE_SEPARATOR, -1);
 	    peer = peer_new(split[0], split[1]);
 	    peer->last_mon_ping_answered.tv_sec = g_strtod(split[2], NULL);
+	    peer->last_mon_ping_answered.tv_usec = 0;
 	    ts_add(node, peer); //TODO: validate ip and port
 
 	    g_strfreev(split);
