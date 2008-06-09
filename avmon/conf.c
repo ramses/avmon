@@ -27,7 +27,7 @@
 /**
  * \file conf.c
  * \author Ramses Morales
- * \version $Id: conf.c,v 1.3 2008/06/04 16:41:07 ramses Exp $
+ * \version $Id: conf.c,v 1.4 2008/06/09 15:26:24 ramses Exp $
  */
 
 #include <sys/socket.h>
@@ -47,6 +47,7 @@
 
 #define CONF_GROUP_PROTOCOL   "protocol"
 #define CONF_period           "period"
+#define CONF_enable_forgetful_pinging "enable_forgetful_pinging"
 
 #define CONF_GROUP_MONITORING "monitoring"
 //CONF_PERIOD
@@ -74,6 +75,7 @@ struct _Conf {
     char *host_ip;
 
     int protocol_period;
+    gboolean enable_forgetful_pinging;
 
     int monitoring_period;
     char *default_av_output_prefix;
@@ -172,6 +174,12 @@ conf_load(const char *fname, GError **gerror)
     if ( *gerror )
 	goto exit_with_error;
 
+    conf->enable_forgetful_pinging =
+	g_key_file_get_boolean(gkf, CONF_GROUP_PROTOCOL,
+			       CONF_enable_forgetful_pinging, gerror);
+    if ( *gerror )
+	goto exit_with_error;
+
     // MONITORING CONF
     conf->monitoring_period =
 	g_key_file_get_integer(gkf, CONF_GROUP_MONITORING, CONF_period, gerror);
@@ -254,4 +262,10 @@ conf_get_host_ip(Conf *conf)
 	return NULL;
     
     return g_strdup(conf->host_ip);
+}
+
+gboolean
+conf_enable_forgetful_pinging(Conf *conf)
+{
+    return conf->enable_forgetful_pinging;
 }

@@ -27,7 +27,7 @@
 /**
  * \file conf.h
  * \author Ramses Morales
- * \version $Id: conf.h,v 1.3 2008/06/04 16:41:07 ramses Exp $
+ * \version $Id: conf.h,v 1.4 2008/06/09 15:26:24 ramses Exp $
  */
 
 #ifndef __AVMON_CONF_H__
@@ -59,6 +59,7 @@ int conf_get_introducer_timeout(Conf *conf);
  * after use.
  */
 char *conf_get_host_ip(Conf *conf);
+gboolean conf_enable_forgetful_pinging(Conf *conf);
 
 AVMON_END_DECLS
 
