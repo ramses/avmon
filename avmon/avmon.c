@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.15 2008/06/10 02:34:12 ramses Exp $
+ * \version $Id: avmon.c,v 1.16 2008/06/10 03:31:00 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1324,17 +1324,12 @@ bye:
 
 #define CACHE_SEPARATOR "|"
 
-static void
-load_cached_sets(AVMONNode *node)
+static char **
+prepare_cache(AVMONNode *node)
 {
     struct passwd *spwd = NULL;
+    char *cache_dir = NULL, **ps_ts_name = NULL;
     struct stat statbuff;
-    char *cache_dir = NULL, *ps_cache_name = NULL, *ts_cache_name = NULL;
-    char *line = NULL, **split = NULL;
-    GIOChannel *ps_cache = NULL, *ts_cache = NULL;
-    GIOStatus status;
-    GError *gerror = NULL;
-    AVMONPeer *peer = NULL;
     
     spwd = getpwuid(getuid());
 
@@ -1343,19 +1338,34 @@ load_cached_sets(AVMONNode *node)
     if ( !stat(cache_dir, &statbuff) ) {
 	if ( !S_ISDIR(statbuff.st_mode) ) {
 	    g_warning("set-cache not used. %s is not a directory", cache_dir);
-	    goto bye;
+	    return NULL;
 	}
     } else if ( errno == ENOENT ) {
 	if ( mkdir(cache_dir, S_IRWXU) ) {
 	    g_warning("couldn't create set-cache directory: %s", strerror(errno));
-	    goto bye;
+	    return NULL;
 	}
     }
 
-    ps_cache_name = g_strconcat(cache_dir, "ps_cache.txt", NULL);
-    ts_cache_name = g_strconcat(cache_dir, "ts_cache.txt", NULL);
+    ps_ts_name = (char **) g_malloc(3 * sizeof(char *));
+    ps_ts_name[0] = g_strconcat(cache_dir, "ps_cache.txt", NULL);
+    ps_ts_name[1] = g_strconcat(cache_dir, "ts_cache.txt", NULL);
+    ps_ts_name[2] = NULL;
+}
 
-    if ( !(ps_cache = g_io_channel_new_file(ps_cache_name, "r", &gerror)) ) {
+static void
+load_cached_sets(AVMONNode *node)
+{
+    char *line = NULL, **split = NULL, **ps_ts_name = NULL;
+    GIOChannel *ps_cache = NULL, *ts_cache = NULL;
+    GIOStatus status;
+    GError *gerror = NULL;
+    AVMONPeer *peer = NULL;
+    
+    if ( !(ps_ts_name = prepare_cache(node)) )
+	goto bye;
+
+    if ( !(ps_cache = g_io_channel_new_file(ps_ts_name[0], "r", &gerror)) ) {
 	if ( !g_error_matches(gerror, G_FILE_ERROR, G_FILE_ERROR_NOENT) )
 	    g_warning("couldn't open ps-cache: %s", gerror->message);
 	g_error_free(gerror);
@@ -1385,7 +1395,7 @@ load_cached_sets(AVMONNode *node)
 	}
     }
 
-    if ( !(ts_cache = g_io_channel_new_file(ts_cache_name, "r", &gerror)) ) {
+    if ( !(ts_cache = g_io_channel_new_file(ps_ts_name[1], "r", &gerror)) ) {
 	if ( !g_error_matches(gerror, G_FILE_ERROR, G_FILE_ERROR_NOENT) )
 	    g_warning("couldn't open ts-cache: %s", gerror->message);
 	g_error_free(gerror);
@@ -1423,16 +1433,12 @@ load_cached_sets(AVMONNode *node)
     }
 
 bye:    
-    if ( cache_dir )
-	g_free(cache_dir);
-    if ( ps_cache_name )
-	g_free(ps_cache_name);
-    if ( ts_cache_name )
-	g_free(ts_cache_name);
     if ( ps_cache )
 	g_io_channel_close(ps_cache);
     if ( ts_cache )
 	g_io_channel_close(ts_cache);
+    if ( ps_ts_name )
+	g_strfreev(ps_ts_name);
 }
 
 /**
