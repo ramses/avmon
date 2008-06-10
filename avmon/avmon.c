@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.13 2008/06/09 18:13:44 ramses Exp $
+ * \version $Id: avmon.c,v 1.14 2008/06/10 02:26:52 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1371,6 +1371,11 @@ load_cached_sets(AVMONNode *node)
 		break;
 		
 	    split = g_strsplit(line, CACHE_SEPARATOR, -1);
+	    if ( split[0] == NULL || split[1] == NULL || split[2] != NULL ) {
+		g_strfreev(split);
+		g_warning("ps-cache is br0k3n");
+		break;
+	    }
 	    util_eliminate_newline(split[1]);
 	    ps_add(node, peer_new(split[0], split[1])); //TODO: validate ip and port
 
@@ -1394,11 +1399,21 @@ load_cached_sets(AVMONNode *node)
 	    }
 	    if ( status != G_IO_STATUS_NORMAL )
 		break;
-		
+
 	    split = g_strsplit(line, CACHE_SEPARATOR, -1);
+	    if ( split[0] == NULL || split[1] == NULL || split[2] == NULL
+		 || split[3] == NULL || split[4] == NULL || split[5] != NULL ) {
+		g_strfreev(split);
+		g_warning("ts-cache is br0k3n");
+		break;
+	    }
 	    peer = peer_new(split[0], split[1]);
-	    peer->last_mon_ping_answered.tv_sec = g_strtod(split[2], NULL);
+	    peer->last_mon_ping_answered.tv_sec = (glong) g_strtod(split[2], NULL);
 	    peer->last_mon_ping_answered.tv_usec = 0;
+	    peer->last_mon_ping.tv_sec = (glong) g_strtod(split[3], NULL);
+	    peer->last_mon_ping.tv_usec = 0;
+	    peer->first_session_ping.tv_sec = (glong) g_strtod(split[4], NULL);
+	    peer->first_session_ping.tv_usec = 0;
 	    ts_add(node, peer); //TODO: validate ip and port
 
 	    g_strfreev(split);
