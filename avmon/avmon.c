@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.16 2008/06/10 03:31:00 ramses Exp $
+ * \version $Id: avmon.c,v 1.17 2008/06/10 15:42:55 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1546,6 +1546,71 @@ exit_with_error:
     return NULL;
 }
 
+static void
+save_ps_peer(gpointer _key, gpointer _peer, gpointer _ps_cache)
+{
+    AVMONPeer *peer = (AVMONPeer *) _peer;
+    gsize bytes_written;
+    GError *gerror = NULL;
+    char *buff = g_strconcat(peer->ip, CACHE_SEPARATOR, peer->port, "\n", NULL);
+    
+    g_io_channel_write_chars((GIOChannel *) _ps_cache, buff, -1, &bytes_written,
+			     &gerror);
+    g_free(buff);
+}
+
+static void
+save_ts_peer(gpointer _key, gpointer _peer, gpointer _ts_cache)
+{
+    AVMONPeer *peer = (AVMONPeer *) _peer;
+    gsize bytes_written;
+    GError *gerror = NULL;
+    char *buff = g_strdup_printf("%s%s%s%s%lu%s%lu%s%lu\n", 
+				 peer->ip, CACHE_SEPARATOR, peer->port,
+				 CACHE_SEPARATOR, peer->last_mon_ping_answered.tv_sec,
+				 CACHE_SEPARATOR, peer->last_mon_ping.tv_sec,
+				 CACHE_SEPARATOR, peer->first_session_ping.tv_sec);
+				 
+    g_io_channel_write_chars((GIOChannel *) _ts_cache, buff, -1, &bytes_written,
+			     &gerror);
+    g_free(buff);
+}
+
+static void
+save_sets(AVMONNode *node)
+{
+    char **ps_ts_name = NULL;
+    GIOChannel *ps_cache = NULL, *ts_cache = NULL;
+    GError *gerror = NULL;
+    
+    if ( !(ps_ts_name = prepare_cache(node)) )
+	goto bye;
+
+    if ( !(ps_cache = g_io_channel_new_file(ps_ts_name[0], "w", &gerror)) ) {
+	g_warning("couldn't open ps-cache to write: %s", gerror->message);
+	g_error_free(gerror);
+	gerror = NULL;
+    } else {
+	g_hash_table_foreach(node->ps, save_ps_peer, ps_cache);
+    }
+
+    if ( !(ts_cache = g_io_channel_new_file(ps_ts_name[1], "w", &gerror)) ) {
+	g_warning("couldn't open ts-cache to write: %s", gerror->message);
+	g_error_free(gerror);
+	gerror = NULL;
+    } else {
+	g_hash_table_foreach(node->ts, save_ts_peer, ts_cache);
+    }
+    
+bye:
+    if ( ps_ts_name )
+	g_strfreev(ps_ts_name);
+    if ( ps_cache )
+	g_io_channel_close(ps_cache);
+    if ( ts_cache )
+	g_io_channel_close(ts_cache);
+}
+
 int
 avmon_stop(AVMONNode *node, GError **gerror)
 {
@@ -1563,6 +1628,8 @@ avmon_stop(AVMONNode *node, GError **gerror)
 	return -1;
     }
     pthread_join(node->tid, NULL);
+
+    save_sets(node);
     
     avmon_node_free(node);
 
