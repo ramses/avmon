@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.14 2008/06/10 02:26:52 ramses Exp $
+ * \version $Id: avmon.c,v 1.15 2008/06/10 02:34:12 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -464,7 +464,7 @@ forgetful_ping_dec(AVMONNode *node, AVMONPeer *peer)
 }
 
 static void
-_ts_foreach(gpointer _key, gpointer _peer, gpointer _node)
+do_monitor_peer(gpointer _key, gpointer _peer, gpointer _node)
 {
     AVMONPeer *peer = (AVMONPeer *) _peer;
     AVMONNode *node = (AVMONNode *) _node;
@@ -483,11 +483,13 @@ _ts_foreach(gpointer _key, gpointer _peer, gpointer _node)
     }
 }
 
+typedef void (*TSFOREACHFunc) (gpointer _key, gpointer _peer, gpointer _node);
+
 static void
-ts_foreach(AVMONNode *node)
+ts_foreach(AVMONNode *node, TSFOREACHFunc func)
 {
     pthread_mutex_lock(&node->mutex_ts);
-    g_hash_table_foreach(node->ts, _ts_foreach, node);
+    g_hash_table_foreach(node->ts, func, node);
     pthread_mutex_unlock(&node->mutex_ts);
     
     node->session_first_ts_ping = FALSE;
@@ -1074,7 +1076,7 @@ monitoring_loop(void *_node)
 	//TODO: count monitoring pings received to determine if rejoin needed
 
 	//TODO: add suport for any user provided monitor
-	ts_foreach(node);
+	ts_foreach(node, do_monitor_peer);
     }
 
 #ifdef DEBUG
