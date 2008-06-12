@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.17 2008/06/10 15:42:55 ramses Exp $
+ * \version $Id: avmon.c,v 1.18 2008/06/12 22:39:47 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1324,33 +1324,46 @@ bye:
 
 #define CACHE_SEPARATOR "|"
 
-static char **
-prepare_cache(AVMONNode *node)
+static char *
+prepare_cache_dir(AVMONNode *node)
 {
-    struct passwd *spwd = NULL;
-    char *cache_dir = NULL, **ps_ts_name = NULL;
+    char *cache_dir = NULL;
     struct stat statbuff;
+    struct passwd *spwd = getpwuid(getuid());
     
-    spwd = getpwuid(getuid());
-
     cache_dir = g_strdup_printf("%s/.avmon/%s_%s/", spwd->pw_dir, node->ip_c,
 				node->port_c);
     if ( !stat(cache_dir, &statbuff) ) {
 	if ( !S_ISDIR(statbuff.st_mode) ) {
 	    g_warning("set-cache not used. %s is not a directory", cache_dir);
+	    g_free(cache_dir);
 	    return NULL;
 	}
     } else if ( errno == ENOENT ) {
 	if ( mkdir(cache_dir, S_IRWXU) ) {
 	    g_warning("couldn't create set-cache directory: %s", strerror(errno));
+	    g_free(cache_dir);
 	    return NULL;
 	}
     }
+
+    return cache_dir;
+}
+
+static char **
+prepare_cache(AVMONNode *node)
+{
+    char *cache_dir = NULL, **ps_ts_name = NULL;
+
+    if ( !(cache_dir = prepare_cache_dir(node)) )
+	return NULL;
 
     ps_ts_name = (char **) g_malloc(3 * sizeof(char *));
     ps_ts_name[0] = g_strconcat(cache_dir, "ps_cache.txt", NULL);
     ps_ts_name[1] = g_strconcat(cache_dir, "ts_cache.txt", NULL);
     ps_ts_name[2] = NULL;
+
+    return ps_ts_name;
 }
 
 static void
@@ -1531,6 +1544,8 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
     g_debug("starting monitoring loop");
 #endif
     pthread_create(&node->m_tid, NULL, monitoring_loop, (void *) node);
+
+    //record_session_start(node);
 
     return node;
 
