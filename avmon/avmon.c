@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.18 2008/06/12 22:39:47 ramses Exp $
+ * \version $Id: avmon.c,v 1.19 2008/06/15 20:06:34 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -140,6 +140,8 @@ struct _AVMONNode {
     gboolean enable_forgetful_pinging;
     gboolean session_first_ts_ping;
     glong unresponsive_threshold;
+
+    GTimeVal session_started;
 };
 
 static inline int
@@ -611,6 +613,8 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
 
     node->enable_forgetful_pinging = conf_enable_forgetful_pinging(conf);
     node->session_first_ts_ping = TRUE;
+
+    g_get_current_time(&node->session_started);
 
     return node;
 
@@ -1454,6 +1458,34 @@ bye:
 	g_strfreev(ps_ts_name);
 }
 
+static void
+record_session_start(AVMONNode *node)
+{
+    char *cache_dir_name = prepare_cache_dir(node);
+    char *sessions_name = NULL, *buff = NULL;
+    GIOChannel *sessions = NULL;
+    GError *gerror = NULL;
+    gsize bytes_written;
+    
+    if ( !cache_dir_name )
+	g_error("cannot write session start time"); //aborts
+	
+    sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
+
+    if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) )
+	g_error("Could not open %s: %s", sessions_name, gerror->message); //aborts
+
+    buff = g_strdup_printf("START:%lu\n", node->session_started.tv_sec);
+    g_io_channel_write_chars(sessions, buff, -1, &bytes_written, &gerror);
+    if ( gerror )
+	g_error("Could not write to %s: %s", sessions_name, gerror->message); //aborts
+
+    g_free(cache_dir_name);
+    g_free(sessions_name);
+    g_free(buff);
+    g_io_channel_close(sessions);
+}
+
 /**
  * Use to create an AVMON node.
  *
@@ -1545,7 +1577,7 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 #endif
     pthread_create(&node->m_tid, NULL, monitoring_loop, (void *) node);
 
-    //record_session_start(node);
+    record_session_start(node);
 
     return node;
 
@@ -1626,6 +1658,47 @@ bye:
 	g_io_channel_close(ts_cache);
 }
 
+static void
+record_session_end(AVMONNode *node)
+{
+    char *cache_dir_name = prepare_cache_dir(node);
+    char *sessions_name = NULL, *buff = NULL;
+    GIOChannel *sessions = NULL;
+    GError *gerror = NULL;
+    gsize bytes_written;
+    GTimeVal gtv;
+    
+    if ( !cache_dir_name ) {
+	g_critical("cannot write session end time"); //TODO: should I use the aborting one?
+	goto bye;
+    }
+
+    sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
+
+    if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) ) {
+	g_critical("Could not open %s: %s", sessions_name, gerror->message);
+	goto bye;
+    }
+
+    g_get_current_time(&gtv);
+    buff = g_strdup_printf("END:%lu\n", gtv.tv_sec);
+    g_io_channel_write_chars(sessions, buff, -1, &bytes_written, &gerror);
+    if ( gerror )
+	g_critical("Could not write to %s: %s", sessions_name, gerror->message);
+
+bye:
+    if ( cache_dir_name )
+	g_free(cache_dir_name);
+    if ( sessions_name )
+	g_free(sessions_name);
+    if ( buff )
+	g_free(buff);
+    if ( sessions )
+	g_io_channel_close(sessions);
+    if ( gerror )
+	g_error_free(gerror);
+}
+
 int
 avmon_stop(AVMONNode *node, GError **gerror)
 {
@@ -1645,6 +1718,7 @@ avmon_stop(AVMONNode *node, GError **gerror)
     pthread_join(node->tid, NULL);
 
     save_sets(node);
+    record_session_end(node);
     
     avmon_node_free(node);
 
