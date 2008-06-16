@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.21 2008/06/16 16:28:28 ramses Exp $
+ * \version $Id: avmon.c,v 1.22 2008/06/16 16:33:29 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1466,17 +1466,26 @@ bye:
 	g_strfreev(ps_ts_name);
 }
 
+static char *
+avmon_sessions_file_name(AVMONNode *node)
+{
+    char *cache_dir_name = avmon_cache_dir_name(node);
+    char *sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
+    
+    g_free(cache_dir_name);
+    
+    return sessions_name;
+}
+
 static void
 record_session_start(AVMONNode *node)
 {
-    char *cache_dir_name = avmon_cache_dir_name(node);
-    char *sessions_name = NULL, *buff = NULL;
+    char *sessions_name = avmon_sessions_file_name(node);
+    char *buff = NULL;
     GIOChannel *sessions = NULL;
     GError *gerror = NULL;
     gsize bytes_written;
     
-    sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
-
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) )
 	g_error("Could not open %s: %s", sessions_name, gerror->message); //aborts
 
@@ -1485,7 +1494,6 @@ record_session_start(AVMONNode *node)
     if ( gerror )
 	g_error("Could not write to %s: %s", sessions_name, gerror->message); //aborts
 
-    g_free(cache_dir_name);
     g_free(sessions_name);
     g_free(buff);
     g_io_channel_close(sessions);
@@ -1667,15 +1675,13 @@ bye:
 static void
 record_session_end(AVMONNode *node)
 {
-    char *cache_dir_name = avmon_cache_dir_name(node);
-    char *sessions_name = NULL, *buff = NULL;
+    char *sessions_name = avmon_sessions_file_name(node);
+    char *buff = NULL;
     GIOChannel *sessions = NULL;
     GError *gerror = NULL;
     gsize bytes_written;
     GTimeVal gtv;
     
-    sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
-
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) ) {
 	g_critical("Could not open %s: %s", sessions_name, gerror->message);
 	goto bye;
@@ -1688,10 +1694,7 @@ record_session_end(AVMONNode *node)
 	g_critical("Could not write to %s: %s", sessions_name, gerror->message);
 
 bye:
-    if ( cache_dir_name )
-	g_free(cache_dir_name);
-    if ( sessions_name )
-	g_free(sessions_name);
+    g_free(sessions_name);
     if ( buff )
 	g_free(buff);
     if ( sessions )
