@@ -27,7 +27,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.7 2008/06/16 17:57:58 ramses Exp $
+ * \version $Id: messages.c,v 1.8 2008/06/16 18:11:10 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -641,7 +641,7 @@ bye:
 
 int
 msg_write_get_raw_availability_reply(int socketfd, const char *filename,
-				     /*const char *sessions_filename, */
+				     /*const char *sessions_filename,*/
 				     GError **gerror)
 {
     int res = -1;
@@ -663,7 +663,7 @@ msg_write_get_raw_availability_reply(int socketfd, const char *filename,
 	/*
 	write_file(socketfd, sessions_filename, bytes, gerror);
 	if ( gerror )
-	goto bye;
+	    goto bye;
 	*/
     }
 
@@ -673,17 +673,43 @@ bye:
     return res;
 }
 
+static void
+read_file(int socketfd, FILE *file, int timeout, GError **gerror)
+{
+    uint32_t bytes, count;
+    char buff[MSG_BUFFSIZE];
+    fd_set rset;
+    struct timeval tv;
+    
+    if ( net_read_32bit(socketfd, &bytes, gerror) )
+	return;
+
+    while ( bytes ) {
+	FD_ZERO(&rset);
+	FD_SET(socketfd, &rset);
+	tv.tv_sec = timeout;
+	tv.tv_usec = 0;
+	if ( select(socketfd + 1, &rset, NULL, NULL, &tv) == -1 )
+	    return;
+	    
+	count = bytes > MSG_BUFFSIZE ? MSG_BUFFSIZE : bytes;
+	bytes -= count;
+	if ( net_read(socketfd, buff, &count, gerror) )
+	    return;
+	    
+	fprintf(file, "%s", buff);
+    }
+}
+
 int
 msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 					 int timeout, GError **gerror)
 {
     int result = 1;
-    uint32_t bytes, count;
     fd_set rset;
-    struct timeval tv;
     FILE *file = NULL;
-    char buff[MSG_BUFFSIZE];
     uint8_t known = 0;
+    struct timeval tv;
 
     if ( !(file = fopen(filename, "w")) ) {
 	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
@@ -704,24 +730,9 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 	goto bye;
     
     if ( known ) {
-	if ( net_read_32bit(socketfd, &bytes, gerror) )
+	read_file(socketfd, file, timeout, gerror);
+	if ( gerror )
 	    goto bye;
-
-	while ( bytes ) {
-	    FD_ZERO(&rset);
-	    FD_SET(socketfd, &rset);
-	    tv.tv_sec = timeout;
-	    tv.tv_usec = 0;
-	    if ( select(socketfd + 1, &rset, NULL, NULL, &tv) == -1 )
-		goto bye;
-	    
-	    count = bytes > MSG_BUFFSIZE ? MSG_BUFFSIZE : bytes;
-	    bytes -= count;
-	    if ( net_read(socketfd, buff, &count, gerror) )
-		goto bye;
-	    
-	    fprintf(file, "%s", buff);
-	}
     } else {
 	fprintf(file, "UNKNOWN\n");
     }
