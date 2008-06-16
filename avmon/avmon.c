@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.22 2008/06/16 16:33:29 ramses Exp $
+ * \version $Id: avmon.c,v 1.23 2008/06/16 16:35:50 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1451,7 +1451,7 @@ load_cached_sets(AVMONNode *node)
 	    peer->last_mon_ping.tv_usec = 0;
 	    peer->first_session_ping.tv_sec = (glong) g_strtod(split[4], NULL);
 	    peer->first_session_ping.tv_usec = 0;
-	    ts_add(node, peer); //TODO: validate ip and port
+	    ts_add(node, peer); //TODO: validate ip and port.
 
 	    g_strfreev(split);
 	}
