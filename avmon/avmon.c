@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.19 2008/06/15 20:06:34 ramses Exp $
+ * \version $Id: avmon.c,v 1.20 2008/06/16 16:10:42 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1329,14 +1329,21 @@ bye:
 #define CACHE_SEPARATOR "|"
 
 static char *
+avmon_cache_dir_name(AVMONNode *node)
+{
+    struct passwd *spwd = getpwuid(getuid());
+    
+    return g_strdup_printf("%s/.avmon/%s_%s/", spwd->pw_dir, node->ip_c,
+			   node->port_c);
+}
+
+static char *
 prepare_cache_dir(AVMONNode *node)
 {
     char *cache_dir = NULL;
     struct stat statbuff;
-    struct passwd *spwd = getpwuid(getuid());
     
-    cache_dir = g_strdup_printf("%s/.avmon/%s_%s/", spwd->pw_dir, node->ip_c,
-				node->port_c);
+    cache_dir = avmon_cache_dir_name(node);
     if ( !stat(cache_dir, &statbuff) ) {
 	if ( !S_ISDIR(statbuff.st_mode) ) {
 	    g_warning("set-cache not used. %s is not a directory", cache_dir);
