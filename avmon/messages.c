@@ -27,7 +27,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.6 2008/06/04 16:41:07 ramses Exp $
+ * \version $Id: messages.c,v 1.7 2008/06/16 17:57:58 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -600,61 +600,76 @@ msg_read_get_raw_availability_reply(int socketfd, GError **gerror)
 #define MSG_BUFFSIZE 2048
 #define MSG_GET_RAW_AVAILABILITY_MAX 131072
 
+static void
+write_file(int socketfd, const char *filename, uint32_t bytes, GError **gerror)
+{
+    uint32_t count;
+    uint8_t header[4], buff[MSG_BUFFSIZE];
+    char *copy_name = g_strconcat(filename, "_msg_tmp", NULL);
+    FILE *file = NULL;
+
+    if ( !(bytes = util_fcopy(filename, copy_name, bytes, TRUE, gerror)) )
+	goto bye;
+    
+    bytes = htonl(bytes);
+    memcpy(&header[0], &bytes, 4);
+    bytes = ntohl(bytes);
+
+    if ( net_write(socketfd, &header, 4, gerror) )
+	goto bye;
+
+    if ( !(file = fopen(copy_name, "r")) )
+	goto bye;
+    for ( ; bytes; bytes -= count ) {
+	count = bytes > MSG_BUFFSIZE ? MSG_BUFFSIZE : bytes;
+	if ( fread(buff, count, 1, file) != 1 ) {
+	    if ( ferror(file) ) {
+		g_set_error(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
+			    "problem reading %s", copy_name);
+		goto bye;
+	    }
+	}
+	if ( net_write(socketfd, buff, count, gerror) )
+	    goto bye;
+    }
+    
+bye:
+    if ( file )
+	fclose(file);
+    g_free(copy_name);
+}
+
 int
 msg_write_get_raw_availability_reply(int socketfd, const char *filename,
+				     /*const char *sessions_filename, */
 				     GError **gerror)
 {
-    int res = -1, count;
-    char *copy_name = NULL;
-    uint8_t msg_head[MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE], buff[MSG_BUFFSIZE];
+    int res = -1;
+    uint8_t msg_head[MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE];
     uint32_t bytes = MSG_GET_RAW_AVAILABILITY_MAX; //TODO: do not have a max, but a variable number of bytes.
-    FILE *file = NULL;
 
     msg_head[0] = MSG_GET_RAW_AVAILABILITY_REPLY;
     msg_head[1] = filename ? 0X01 : 0X00;
 
-    count = MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE;
-    if ( !filename ) {
-	bytes = 0;
-	memcpy(&msg_head[2], &bytes, 4);
-	if ( net_write(socketfd, &msg_head, count, gerror) )
-	    goto bye;
-    } else {
-	copy_name = g_strconcat(filename, "_msg_tmp", NULL);
-
-	if ( !(bytes = util_fcopy(filename, copy_name, bytes, TRUE, gerror)) )
-	    goto bye;
+    if ( net_write(socketfd, &msg_head, MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE,
+		   gerror) )
+	goto bye;
     
-	bytes = htonl(bytes);
-	memcpy(&msg_head[2], &bytes, 4);
-	bytes = ntohl(bytes);
-
-	if ( net_write(socketfd, &msg_head, count, gerror) )
+    if ( filename ) {
+	write_file(socketfd, filename, bytes, gerror);
+	if ( gerror )
 	    goto bye;
 
-	if ( !(file = fopen(copy_name, "r")) )
-	    goto bye;
-	for ( ; bytes; bytes -= count ) {
-	    count = bytes > MSG_BUFFSIZE ? MSG_BUFFSIZE : bytes;
-	    if ( fread(buff, count, 1, file) != 1 ) {
-		if ( ferror(file) ) {
-		    g_set_error(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
-				"problem reading %s", copy_name);
-		    goto bye;
-		}
-	    }
-	    if ( net_write(socketfd, buff, count, gerror) )
-		goto bye;
-	}
+	/*
+	write_file(socketfd, sessions_filename, bytes, gerror);
+	if ( gerror )
+	goto bye;
+	*/
     }
 
     res = 0;
 
 bye:
-    if ( file )
-	fclose(file);
-    g_free(copy_name);
-
     return res;
 }
 

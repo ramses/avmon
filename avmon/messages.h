@@ -27,7 +27,7 @@
 /**
  * \file messages.h
  * \author Ramses Morales
- * \version $Id: messages.h,v 1.5 2008/06/04 16:41:07 ramses Exp $
+ * \version $Id: messages.h,v 1.6 2008/06/16 17:57:58 ramses Exp $
  */
 
 #ifndef __AVMON_MESSAGES_H__
@@ -91,7 +91,7 @@ extern const char *MSG_HEAD;
 #define MSG_GET_PS_SIZE   (8+1)
 #define MSG_GET_TS_SIZE   (8+1)
 
-#define MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE (1 + 1 + 4)
+#define MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE (1 + 1)
     
 #define MSG_DELIMITER_C   '|'
 #define MSG_DELIMITER_S   "|"
