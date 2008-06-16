@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.20 2008/06/16 16:10:42 ramses Exp $
+ * \version $Id: avmon.c,v 1.21 2008/06/16 16:28:28 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1337,7 +1337,7 @@ avmon_cache_dir_name(AVMONNode *node)
 			   node->port_c);
 }
 
-static char *
+static gboolean
 prepare_cache_dir(AVMONNode *node)
 {
     char *cache_dir = NULL;
@@ -1348,31 +1348,33 @@ prepare_cache_dir(AVMONNode *node)
 	if ( !S_ISDIR(statbuff.st_mode) ) {
 	    g_warning("set-cache not used. %s is not a directory", cache_dir);
 	    g_free(cache_dir);
-	    return NULL;
+	    return FALSE;
 	}
     } else if ( errno == ENOENT ) {
 	if ( mkdir(cache_dir, S_IRWXU) ) {
 	    g_warning("couldn't create set-cache directory: %s", strerror(errno));
 	    g_free(cache_dir);
-	    return NULL;
+	    return FALSE;
 	}
     }
 
-    return cache_dir;
+    g_free(cache_dir);
+    return TRUE;
 }
 
 static char **
-prepare_cache(AVMONNode *node)
+avmon_psts_cache_file_names(AVMONNode *node)
 {
     char *cache_dir = NULL, **ps_ts_name = NULL;
 
-    if ( !(cache_dir = prepare_cache_dir(node)) )
-	return NULL;
+    cache_dir = avmon_cache_dir_name(node);
 
     ps_ts_name = (char **) g_malloc(3 * sizeof(char *));
     ps_ts_name[0] = g_strconcat(cache_dir, "ps_cache.txt", NULL);
     ps_ts_name[1] = g_strconcat(cache_dir, "ts_cache.txt", NULL);
     ps_ts_name[2] = NULL;
+
+    g_free(cache_dir);
 
     return ps_ts_name;
 }
@@ -1386,8 +1388,7 @@ load_cached_sets(AVMONNode *node)
     GError *gerror = NULL;
     AVMONPeer *peer = NULL;
     
-    if ( !(ps_ts_name = prepare_cache(node)) )
-	goto bye;
+    ps_ts_name = avmon_psts_cache_file_names(node);
 
     if ( !(ps_cache = g_io_channel_new_file(ps_ts_name[0], "r", &gerror)) ) {
 	if ( !g_error_matches(gerror, G_FILE_ERROR, G_FILE_ERROR_NOENT) )
@@ -1468,15 +1469,12 @@ bye:
 static void
 record_session_start(AVMONNode *node)
 {
-    char *cache_dir_name = prepare_cache_dir(node);
+    char *cache_dir_name = avmon_cache_dir_name(node);
     char *sessions_name = NULL, *buff = NULL;
     GIOChannel *sessions = NULL;
     GError *gerror = NULL;
     gsize bytes_written;
     
-    if ( !cache_dir_name )
-	g_error("cannot write session start time"); //aborts
-	
     sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
 
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) )
@@ -1570,6 +1568,8 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 	node->join_status = JOIN_STATUS_IN;
     }
 
+    if ( !prepare_cache_dir(node) )
+	exit(1);
     load_cached_sets(node);
 
     //main protocol loop
@@ -1637,8 +1637,7 @@ save_sets(AVMONNode *node)
     GIOChannel *ps_cache = NULL, *ts_cache = NULL;
     GError *gerror = NULL;
     
-    if ( !(ps_ts_name = prepare_cache(node)) )
-	goto bye;
+    ps_ts_name = avmon_psts_cache_file_names(node);
 
     if ( !(ps_cache = g_io_channel_new_file(ps_ts_name[0], "w", &gerror)) ) {
 	g_warning("couldn't open ps-cache to write: %s", gerror->message);
@@ -1668,18 +1667,13 @@ bye:
 static void
 record_session_end(AVMONNode *node)
 {
-    char *cache_dir_name = prepare_cache_dir(node);
+    char *cache_dir_name = avmon_cache_dir_name(node);
     char *sessions_name = NULL, *buff = NULL;
     GIOChannel *sessions = NULL;
     GError *gerror = NULL;
     gsize bytes_written;
     GTimeVal gtv;
     
-    if ( !cache_dir_name ) {
-	g_critical("cannot write session end time"); //TODO: should I use the aborting one?
-	goto bye;
-    }
-
     sessions_name = g_strconcat(cache_dir_name, "sessions.txt", NULL);
 
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) ) {
