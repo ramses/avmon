@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.24 2008/06/17 17:41:34 ramses Exp $
+ * \version $Id: avmon.c,v 1.25 2008/06/17 19:02:56 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1329,37 +1329,69 @@ bye:
 #define CACHE_SEPARATOR "|"
 
 static char *
-avmon_cache_dir_name(AVMONNode *node)
+avmon_hidden_dir_name(void)
 {
     struct passwd *spwd = getpwuid(getuid());
     
-    return g_strdup_printf("%s/.avmon/%s_%s/", spwd->pw_dir, node->ip_c,
-			   node->port_c);
+    return g_strdup_printf("%s/.avmon/", spwd->pw_dir);
+}
+
+
+static char *
+avmon_cache_dir_name(AVMONNode *node)
+{
+    char *hdir = avmon_hidden_dir_name();
+    char *cdir = NULL;
+    
+    cdir = g_strdup_printf("%s%s_%s/", hdir, node->ip_c, node->port_c);
+    g_free(hdir);
+    return cdir;
 }
 
 static gboolean
 prepare_cache_dir(AVMONNode *node)
 {
-    char *cache_dir = NULL;
+    gboolean result = FALSE;
+    char *cache_dir = NULL, *hdir = NULL;
     struct stat statbuff;
+
+    hdir = avmon_hidden_dir_name();
+    if ( !stat(hdir, &statbuff) ) {
+	if ( !S_ISDIR(statbuff.st_mode) ) {
+	    g_warning("%s is not a directory", hdir);
+	    goto bye;
+	}
+    } else if ( errno == ENOENT ) {
+	if ( mkdir(hdir, S_IRWXU) ) {
+	    g_warning("couldn't create directory (%s): %s", hdir,
+		      strerror(errno));
+	    goto bye;
+	}
+    }
     
     cache_dir = avmon_cache_dir_name(node);
     if ( !stat(cache_dir, &statbuff) ) {
 	if ( !S_ISDIR(statbuff.st_mode) ) {
-	    g_warning("set-cache not used. %s is not a directory", cache_dir);
-	    g_free(cache_dir);
-	    return FALSE;
+	    g_warning("%s is not a directory", cache_dir);
+	    goto bye;
 	}
     } else if ( errno == ENOENT ) {
 	if ( mkdir(cache_dir, S_IRWXU) ) {
-	    g_warning("couldn't create set-cache directory: %s", strerror(errno));
-	    g_free(cache_dir);
-	    return FALSE;
+	    g_warning("couldn't create directory (%s): %s", cache_dir,
+		      strerror(errno));
+	    goto bye;
 	}
     }
 
-    g_free(cache_dir);
-    return TRUE;
+    result = TRUE;
+    
+bye:
+    if ( hdir )
+	g_free(hdir);
+    if ( cache_dir )
+	g_free(cache_dir);
+    
+    return result;
 }
 
 static char **
