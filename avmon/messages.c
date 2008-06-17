@@ -27,7 +27,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.9 2008/06/17 17:41:35 ramses Exp $
+ * \version $Id: messages.c,v 1.10 2008/06/17 19:04:34 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -657,11 +657,11 @@ msg_write_get_raw_availability_reply(int socketfd, const char *filename,
     
     if ( filename ) {
 	write_file(socketfd, filename, bytes, gerror);
-	if ( gerror )
+	if ( *gerror )
 	    goto bye;
 
 	write_file(socketfd, sessions_filename, bytes, gerror);
-	if ( gerror )
+	if ( *gerror )
 	    goto bye;
     }
 
@@ -692,6 +692,7 @@ read_file(int socketfd, FILE *file, int timeout, GError **gerror)
 	    
 	count = bytes > MSG_BUFFSIZE ? MSG_BUFFSIZE : bytes;
 	bytes -= count;
+	buff[count] = '\0';
 	if ( net_read(socketfd, buff, &count, gerror) )
 	    return;
 	    
@@ -735,10 +736,10 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
     
     if ( known ) {
 	read_file(socketfd, file, timeout, gerror);
-	if ( gerror )
+	if ( *gerror )
 	    goto bye;
 	read_file(socketfd, s_file, timeout, gerror);
-	if ( gerror )
+	if ( *gerror )
 	    goto bye;
     } else {
 	fprintf(file, "UNKNOWN\n");
