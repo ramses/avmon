@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.23 2008/06/16 16:35:50 ramses Exp $
+ * \version $Id: avmon.c,v 1.24 2008/06/17 17:41:34 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1922,6 +1922,7 @@ avmon_get_raw_availability(const GPtrArray *monitors, int timeout,
 void 
 avmon_receive_get_raw_availability(AVMONNode *node, int socketfd)
 {
+    char *sessions_file_name = NULL;
     GError *gerror = NULL;
     GPtrArray *arr = msg_read_target(socketfd, &gerror);
     AVMONPeer *target;
@@ -1931,19 +1932,22 @@ avmon_receive_get_raw_availability(AVMONNode *node, int socketfd)
 
     if ( !(target = ts_lookup(node, g_ptr_array_index(arr, 0), 
 			      g_ptr_array_index(arr, 1))) ) {
-	msg_write_get_raw_availability_reply(socketfd, NULL, &gerror);
+	msg_write_get_raw_availability_reply(socketfd, NULL, NULL, &gerror);
     } else {
 	if ( target->default_output_name ) {
+	    sessions_file_name = avmon_sessions_file_name(node);
 	    fflush(target->default_output); //TODO: instead of flushing, use a checkpoint
 	    msg_write_get_raw_availability_reply(socketfd, target->default_output_name,
-						 &gerror);
+						 sessions_file_name, &gerror);
 	} else {
 	    //TODO: send some warning instead of "UNKNOWN"
-	    msg_write_get_raw_availability_reply(socketfd, NULL, &gerror);
+	    msg_write_get_raw_availability_reply(socketfd, NULL, NULL, &gerror);
 	}
     }
 
 bye:
+    if ( sessions_file_name )
+	g_free(sessions_file_name);
     if ( gerror )
 	g_error_free(gerror);
     if ( arr ) {

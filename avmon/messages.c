@@ -27,7 +27,7 @@
 /**
  * \file messages.c
  * \author Ramses Morales
- * \version $Id: messages.c,v 1.8 2008/06/16 18:11:10 ramses Exp $
+ * \version $Id: messages.c,v 1.9 2008/06/17 17:41:35 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -641,7 +641,7 @@ bye:
 
 int
 msg_write_get_raw_availability_reply(int socketfd, const char *filename,
-				     /*const char *sessions_filename,*/
+				     const char *sessions_filename,
 				     GError **gerror)
 {
     int res = -1;
@@ -660,11 +660,9 @@ msg_write_get_raw_availability_reply(int socketfd, const char *filename,
 	if ( gerror )
 	    goto bye;
 
-	/*
 	write_file(socketfd, sessions_filename, bytes, gerror);
 	if ( gerror )
 	    goto bye;
-	*/
     }
 
     res = 0;
@@ -707,14 +705,20 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 {
     int result = 1;
     fd_set rset;
-    FILE *file = NULL;
+    FILE *file = NULL, *s_file = NULL;
     uint8_t known = 0;
     struct timeval tv;
+    char *sessions_filename = g_strconcat(filename, ".sessions", NULL);
 
     if ( !(file = fopen(filename, "w")) ) {
 	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
 			     "couldn't open output file");
-	return 1;
+	goto bye;
+    }
+    if ( !(s_file = fopen(sessions_filename, "w")) ) {
+	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
+			     "couldn't open output file");
+	goto bye;
     }
 
     FD_ZERO(&rset);
@@ -733,6 +737,9 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 	read_file(socketfd, file, timeout, gerror);
 	if ( gerror )
 	    goto bye;
+	read_file(socketfd, s_file, timeout, gerror);
+	if ( gerror )
+	    goto bye;
     } else {
 	fprintf(file, "UNKNOWN\n");
     }
@@ -740,7 +747,12 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
     result = 0;
     
 bye:
-    fclose(file);
+    if ( file )
+	fclose(file);
+    if ( s_file )
+	fclose(s_file);
+    if ( sessions_filename )
+	g_free(sessions_filename);
 
     return result;
 }

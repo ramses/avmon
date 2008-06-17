@@ -27,7 +27,7 @@
 /**
  * \file messages.h
  * \author Ramses Morales
- * \version $Id: messages.h,v 1.6 2008/06/16 17:57:58 ramses Exp $
+ * \version $Id: messages.h,v 1.7 2008/06/17 17:41:35 ramses Exp $
  */
 
 #ifndef __AVMON_MESSAGES_H__
@@ -140,7 +140,8 @@ int msg_read_get_raw_availability_reply(int socketfd, GError **gerror);
 int msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
 					     int timeout, GError **gerror);
 GPtrArray *msg_read_target(int socketfd, GError **gerror);
-int msg_write_get_raw_availability_reply(int socketfd, const char *filename, GError **gerror);
+int msg_write_get_raw_availability_reply(int socketfd, const char *filename, 
+					 const char *sessions_filename, GError **gerror);
 int msg_send_get_ts(int socketfd, GError **gerror);
 int msg_read_get_ts_reply(int socketfd, GError **gerror);
 GPtrArray *msg_read_ts(int socketfd, GError **gerror);
