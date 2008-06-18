@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.25 2008/06/17 19:02:56 ramses Exp $
+ * \version $Id: avmon.c,v 1.26 2008/06/18 17:40:08 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -142,6 +142,7 @@ struct _AVMONNode {
     glong unresponsive_threshold;
 
     GTimeVal session_started;
+    GTimeVal previous_session_end;
 };
 
 static inline int
@@ -1509,6 +1510,10 @@ avmon_sessions_file_name(AVMONNode *node)
     return sessions_name;
 }
 
+#define SESSION_RECORD_SEPARATOR ":"
+#define SESSION_RECORD_START "START"
+#define SESSION_RECORD_END "END"
+
 static void
 record_session_start(AVMONNode *node)
 {
@@ -1521,7 +1526,9 @@ record_session_start(AVMONNode *node)
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) )
 	g_error("Could not open %s: %s", sessions_name, gerror->message); //aborts
 
-    buff = g_strdup_printf("START:%lu\n", node->session_started.tv_sec);
+    buff = g_strdup_printf("%s%s%lu\n", SESSION_RECORD_START,
+			   SESSION_RECORD_SEPARATOR,
+			   node->session_started.tv_sec);
     g_io_channel_write_chars(sessions, buff, -1, &bytes_written, &gerror);
     if ( gerror )
 	g_error("Could not write to %s: %s", sessions_name, gerror->message); //aborts
@@ -1529,6 +1536,59 @@ record_session_start(AVMONNode *node)
     g_free(sessions_name);
     g_free(buff);
     g_io_channel_close(sessions);
+}
+
+static void
+read_previous_session_time(AVMONNode *node)
+{
+    GError *gerror = NULL;
+    char *line = NULL, *previous_line = NULL, **split = NULL, *blah = NULL;
+    GIOStatus status;
+    char *sessions_name = avmon_sessions_file_name(node);
+    GIOChannel *sessions = g_io_channel_new_file(sessions_name, "r", &gerror);
+
+    node->previous_session_end.tv_sec = 0;
+
+    if ( !sessions ) {
+	if ( !g_error_matches(gerror, G_FILE_ERROR, G_FILE_ERROR_NOENT) )
+	    g_error("problem with sessions (%s) file: %s", sessions_name,
+		    gerror->message); //aborts
+	else
+	    goto bye;
+    }
+    for ( ; ; ) {
+	status = g_io_channel_read_line(sessions, &line, NULL, NULL, &gerror);
+	if ( gerror )
+	    g_error("error reading sessions (%s): %s", sessions_name, 
+		    gerror->message); //aborts
+	if ( status == G_IO_STATUS_EOF ) {
+	    split = g_strsplit(previous_line, SESSION_RECORD_SEPARATOR, -1);
+	    if ( split[0] == NULL || split[1] == NULL || split[2] != NULL )
+		g_error("sessions file (%s) is br0k3n", sessions_name); //aborts
+	    if ( g_ascii_strncasecmp(split[0], SESSION_RECORD_END, 
+				     strlen(SESSION_RECORD_END)) )
+		goto bye;
+	    node->previous_session_end.tv_sec = (glong) g_strtod(split[1], &blah);
+	    if ( blah[0] != '\n' )
+		g_error("sessions file (%s) is br0k3n", sessions_name); //aborts
+	    break;
+	}
+
+	if ( previous_line )
+	    g_free(previous_line);
+	previous_line = line;
+    }
+
+bye:
+    g_free(sessions_name);
+    if ( sessions )
+	g_io_channel_close(sessions);
+    if ( line )
+	g_free(line);
+    if ( previous_line )
+	g_free(previous_line);
+    if ( split )
+	g_strfreev(split);
 }
 
 /**
@@ -1610,6 +1670,7 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 
     if ( !prepare_cache_dir(node) )
 	exit(1);
+    read_previous_session_time(node);
     load_cached_sets(node);
 
     //main protocol loop
@@ -1720,7 +1781,8 @@ record_session_end(AVMONNode *node)
     }
 
     g_get_current_time(&gtv);
-    buff = g_strdup_printf("END:%lu\n", gtv.tv_sec);
+    buff = g_strdup_printf("%s%s%lu\n", SESSION_RECORD_END,
+			   SESSION_RECORD_SEPARATOR, gtv.tv_sec);
     g_io_channel_write_chars(sessions, buff, -1, &bytes_written, &gerror);
     if ( gerror )
 	g_critical("Could not write to %s: %s", sessions_name, gerror->message);
