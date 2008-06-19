@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.26 2008/06/18 17:40:08 ramses Exp $
+ * \version $Id: avmon.c,v 1.27 2008/06/19 23:38:57 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -1402,10 +1402,11 @@ avmon_psts_cache_file_names(AVMONNode *node)
 
     cache_dir = avmon_cache_dir_name(node);
 
-    ps_ts_name = (char **) g_malloc(3 * sizeof(char *));
+    ps_ts_name = (char **) g_malloc(4 * sizeof(char *));
     ps_ts_name[0] = g_strconcat(cache_dir, "ps_cache.txt", NULL);
     ps_ts_name[1] = g_strconcat(cache_dir, "ts_cache.txt", NULL);
-    ps_ts_name[2] = NULL;
+    ps_ts_name[2] = g_strconcat(ps_ts_name[1], ".timestamp", NULL);
+    ps_ts_name[3] = NULL;
 
     g_free(cache_dir);
 
@@ -1416,10 +1417,11 @@ static void
 load_cached_sets(AVMONNode *node)
 {
     char *line = NULL, **split = NULL, **ps_ts_name = NULL;
-    GIOChannel *ps_cache = NULL, *ts_cache = NULL;
+    GIOChannel *ps_cache = NULL, *ts_cache = NULL, *ts_cache_timestamp = NULL;
     GIOStatus status;
     GError *gerror = NULL;
     AVMONPeer *peer = NULL;
+    GTimeVal t_tv;
     
     ps_ts_name = avmon_psts_cache_file_names(node);
 
@@ -1449,6 +1451,7 @@ load_cached_sets(AVMONNode *node)
 	    util_eliminate_newline(split[1]);
 	    ps_add(node, peer_new(split[0], split[1])); //TODO: validate ip and port
 
+	    g_free(line);
 	    g_strfreev(split);
 	}
     }
@@ -1459,6 +1462,32 @@ load_cached_sets(AVMONNode *node)
 	g_error_free(gerror);
 	gerror = NULL;
     } else {
+	if ( !(ts_cache_timestamp =
+	       g_io_channel_new_file(ps_ts_name[2], "r", &gerror)) ) {
+	    g_warning("ts-cache timestamp lost: %s", gerror->message);
+	    g_error_free(gerror);
+	    gerror = NULL;
+	    goto bye;
+	}
+	status = g_io_channel_read_line(ts_cache_timestamp, &line, NULL, NULL, &gerror);
+	if ( gerror || status != G_IO_STATUS_NORMAL ) {
+	    if ( gerror ) {
+		g_warning("problem reading ts-cache timestamp: %s", gerror->message);
+		g_error_free(gerror);
+		gerror = NULL;
+	    } else {
+		g_warning("problem reading ts-cache timestamp");
+	    }
+	    goto bye;
+	}
+	t_tv.tv_sec = (glong) g_ascii_strtod(line, NULL);
+	g_free(line);
+	
+	if ( node->previous_session_end.tv_sec != t_tv.tv_sec ) {
+	    g_warning("bad ts-cache timestamp");
+	    goto bye;
+	}
+
 	for ( ; ; ) {
 	    status = g_io_channel_read_line(ts_cache, &line, NULL, NULL, &gerror);
 	    if ( gerror ) {
@@ -1486,6 +1515,7 @@ load_cached_sets(AVMONNode *node)
 	    peer->first_session_ping.tv_usec = 0;
 	    ts_add(node, peer); //TODO: validate ip and port.
 
+	    g_free(line);
 	    g_strfreev(split);
 	}
     }
@@ -1495,6 +1525,8 @@ bye:
 	g_io_channel_close(ps_cache);
     if ( ts_cache )
 	g_io_channel_close(ts_cache);
+    if ( ts_cache_timestamp )
+	g_io_channel_close(ts_cache_timestamp);
     if ( ps_ts_name )
 	g_strfreev(ps_ts_name);
 }
@@ -1731,12 +1763,13 @@ save_ts_peer(gpointer _key, gpointer _peer, gpointer _ts_cache)
     g_free(buff);
 }
 
-static void
+static gboolean
 save_sets(AVMONNode *node)
 {
     char **ps_ts_name = NULL;
     GIOChannel *ps_cache = NULL, *ts_cache = NULL;
     GError *gerror = NULL;
+    gboolean ts_ok = FALSE;
     
     ps_ts_name = avmon_psts_cache_file_names(node);
 
@@ -1754,6 +1787,7 @@ save_sets(AVMONNode *node)
 	gerror = NULL;
     } else {
 	g_hash_table_foreach(node->ts, save_ts_peer, ts_cache);
+	ts_ok = TRUE;
     }
     
 bye:
@@ -1763,17 +1797,43 @@ bye:
 	g_io_channel_close(ps_cache);
     if ( ts_cache )
 	g_io_channel_close(ts_cache);
+
+    return ts_ok;
 }
 
 static void
-record_session_end(AVMONNode *node)
+record_session_end(AVMONNode *node, gboolean ts_ok)
 {
     char *sessions_name = avmon_sessions_file_name(node);
+    char **psts_names = NULL;
     char *buff = NULL;
-    GIOChannel *sessions = NULL;
+    GIOChannel *sessions = NULL, *ts_timestamp = NULL;
     GError *gerror = NULL;
     gsize bytes_written;
     GTimeVal gtv;
+    g_get_current_time(&gtv);
+
+    if ( ts_ok ) {
+	psts_names = avmon_psts_cache_file_names(node);
+	if ( !(ts_timestamp = g_io_channel_new_file(psts_names[2], "w", &gerror)) ) {
+	    g_critical("couldn't write ts-cache timestamp: %s", gerror->message);
+	    g_error_free(gerror);
+	    gerror = NULL;
+	} else {
+	    buff = g_strdup_printf("%lu\n", gtv.tv_sec);
+	    g_io_channel_write_chars(ts_timestamp, buff, -1, &bytes_written, &gerror);
+	    if ( gerror ) {
+		g_critical("could not write ts-cache timestamp: %s", gerror->message);
+		g_error_free(gerror);
+		gerror = NULL;
+	    }
+	    g_free(buff);
+	    buff = NULL;
+	    g_io_channel_close(ts_timestamp);
+	}
+
+	g_strfreev(psts_names);
+    }
     
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) ) {
 	g_critical("Could not open %s: %s", sessions_name, gerror->message);
@@ -1815,8 +1875,7 @@ avmon_stop(AVMONNode *node, GError **gerror)
     }
     pthread_join(node->tid, NULL);
 
-    save_sets(node);
-    record_session_end(node);
+    record_session_end(node, save_sets(node));
     
     avmon_node_free(node);
 
