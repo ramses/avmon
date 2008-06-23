@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.27 2008/06/19 23:38:57 ramses Exp $
+ * \version $Id: avmon.c,v 1.28 2008/06/23 16:55:41 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -108,6 +108,8 @@ struct _AVMONNode {
     AVMONReplyFunc avmon_reply_func;
     AVMONAvOutputFunc avmon_av_output_func;
     char *default_av_output_prefix;
+
+    int monitoring_period;
 
     enum JoinStatus join_status;
 
@@ -1052,14 +1054,16 @@ monitoring_loop(void *_node)
     AVMONNode *node = (AVMONNode *) _node;
     fd_set rset;
     struct timeval tv;
-    const int period = conf_get_monitoring_period(node->conf);
+    
+    node->monitoring_period = conf_get_monitoring_period(node->conf);
+
     if ( node->enable_forgetful_pinging ) 
-	node->unresponsive_threshold = 3 * period; //TODO: conf?
+	node->unresponsive_threshold = 3 * node->monitoring_period; //TODO: conf?
 
     for ( ; ; ) {
 	FD_ZERO(&rset);
 	FD_SET(node->monitoring_pipe[0], &rset);
-	tv.tv_sec = period;
+	tv.tv_sec = node->monitoring_period;
 	tv.tv_usec = 0;
 	
 	if ( select(node->monitoring_pipe[0] + 1, &rset, NULL, NULL, &tv) 
