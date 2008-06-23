@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.28 2008/06/23 16:55:41 ramses Exp $
+ * \version $Id: avmon.c,v 1.29 2008/06/23 16:58:50 ramses Exp $
  */
 
 #include <stdlib.h>
@@ -406,6 +406,8 @@ avmon_default_monitor(AVMONNode *node, const char *ip, const char *port)
     }
 }
 
+#define AV_OUTPUT_SEPARATOR "|" 
+
 static void
 avmon_default_av_output_function(AVMONNode *node, AVMONPeer *peer)
 {
@@ -417,8 +419,8 @@ avmon_default_av_output_function(AVMONNode *node, AVMONPeer *peer)
     }
 
     if ( peer->default_output ) {
-	fprintf(peer->default_output, "%u %s %s\n", (unsigned int) time(NULL), 
-		peer->ip, peer->port);
+	fprintf(peer->default_output, "%u%s%d\n", (unsigned int) time(NULL),
+		AV_OUTPUT_SEPARATOR, node->monitoring_period);
     }
 }
 
