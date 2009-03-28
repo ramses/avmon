@@ -1,6 +1,6 @@
 /*
  *  AVMON
- *  Copyright (C) 2007, 2008 Ramses Morales
+ *  Copyright (C) 2007, 2008, 2009 Ramses Morales
  *
  *  This file is part of AVMON.
  *
@@ -27,7 +27,7 @@
 /**
  * \file net.c
  * \author Ramses Morales
- * \version $Id: net.c,v 1.4 2008/06/04 16:41:06 ramses Exp $
+ * \version
  */
 
 #include <stdio.h>

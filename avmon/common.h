@@ -1,6 +1,6 @@
 /*
  *  AVMON
- *  Copyright (C) 2007, 2008 Ramses Morales
+ *  Copyright (C) 2007, 2008, 2009 Ramses Morales
  *
  *  This file is part of AVMON.
  *
@@ -21,7 +21,7 @@
 /**
  * \file common.h
  * \author Ramses Morales
- * \version $Id: common.h,v 1.1 2008/05/23 08:35:59 ramses Exp $
+ * \version
  */
 
 #ifndef __AVMON_COMMON_H__

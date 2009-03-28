@@ -1,6 +1,6 @@
 /*
  *  AVMON
- *  Copyright (C) 2007, 2008 Ramses Morales
+ *  Copyright (C) 2007, 2008, 2009 Ramses Morales
  *
  *  This file is part of AVMON.
  *
@@ -27,7 +27,7 @@
 /**
  * \file avmon.c
  * \author Ramses Morales
- * \version $Id: avmon.c,v 1.29 2008/06/23 16:58:50 ramses Exp $
+ * \version
  */
 
 #include <stdlib.h>

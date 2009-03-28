@@ -1,6 +1,6 @@
 /*
  *  AVMON
- *  Copyright (C) 2007, 2008 Ramses Morales
+ *  Copyright (C) 2007, 2008, 2009 Ramses Morales
  *
  *  This file is part of AVMON.
  *
@@ -27,7 +27,7 @@
 /**
  * \file conf.h
  * \author Ramses Morales
- * \version $Id: conf.h,v 1.4 2008/06/09 15:26:24 ramses Exp $
+ * \version
  */
 
 #ifndef __AVMON_CONF_H__

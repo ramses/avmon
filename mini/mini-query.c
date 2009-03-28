@@ -1,6 +1,6 @@
 /*
  *  AVMON mini-query
- *  Copyright 2007, 2008 Ramses Morales.
+ *  Copyright 2007, 2008, 2009 Ramses Morales.
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 /**
  * \file mini-query.c
  * \author Ramses Morales
- * \version $Id: mini-query.c,v 1.5 2008/06/04 16:41:07 ramses Exp $
+ * \version
  */
 
 #include <stdio.h>

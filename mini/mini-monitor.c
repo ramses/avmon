@@ -1,6 +1,6 @@
 /*
  *  AVMON mini-monitor
- *  Copyright 2007, 2008 Ramses Morales
+ *  Copyright 2007, 2008, 2009 Ramses Morales
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -25,7 +25,7 @@
 /**
  * \file mini-monitor.c
  * \author Ramses Morales
- * \version $Id: mini-monitor.c,v 1.5 2008/06/04 16:41:07 ramses Exp $
+ * \version
  */
 
 #include <stdio.h>
@@ -289,7 +289,7 @@ main(int argc, char **argv)
 
     context = g_option_context_new("- Simple p2p availability-monitoring "
 				   "application built with AVMON.");
-    g_option_context_set_summary(context, "Copyright (C) 2007, 2008 Ramses Morales"
+    g_option_context_set_summary(context, "Copyright (C) 2007, 2008, 2009 Ramses Morales"
 				 "\nhttp://avmon.sf.net");
     g_option_context_add_main_entries(context, entries, NULL);
     g_option_context_set_help_enabled(context, TRUE);

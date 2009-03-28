@@ -1,6 +1,6 @@
 /*
  *  AVMON
- *  Copyright (C) 2007, 2008 Ramses Morales
+ *  Copyright (C) 2007, 2008, 2009 Ramses Morales
  *
  *  This file is part of AVMON.
  *
@@ -27,7 +27,7 @@
 /**
  * \file messages.h
  * \author Ramses Morales
- * \version $Id: messages.h,v 1.7 2008/06/17 17:41:35 ramses Exp $
+ * \version
  */
 
 #ifndef __AVMON_MESSAGES_H__
