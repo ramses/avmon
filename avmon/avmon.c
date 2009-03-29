@@ -2180,3 +2180,333 @@ avmon_receive_get_ts(AVMONNode *node, int socketfd)
 
     msg_write_get_ts_reply(socketfd, ts_array, &gerror);
 }
+
+//TODO: session IO should be outside avmon.c
+enum SessionIndicator {
+    SESSION_START = 0,
+    SESSION_END
+};
+
+enum SessionType {
+    SESSION_UNDEFINED = 0,
+    SESSION_MATCHED_START,
+    SESSION_ONGOING,
+    SESSION_UNMATCHED_START
+};
+
+typedef struct {
+    GTimeVal *start;
+    GTimeVal *end;
+    SessionType type;
+} Session;
+
+typedef struct {
+    GTimeVal t;
+    SessionIndicator indicator;
+} SessionLine;
+
+static void
+session_free(Session *s)
+{
+    if ( s->start )
+	g_free(s->start);
+    if ( s->end )
+	g_free(s->end);
+    g_free(s);
+}
+
+static inline void
+session_line_free(SessionLine *sl)
+{
+    g_free(sl);
+}
+
+//EOF == !SessionLine and !*gerror
+static SessionLine *
+read_sessions_line(GIOChannel *sessions, GError **gerror)
+{
+    SessionLine *sl = NULL;
+    GIOStatus status;
+    char *line = NULL, **split = NULL;
+    
+    if ( (status = g_io_channel_read_line(sessions, &line, NULL, NULL, gerror))
+	 == G_IO_STATUS_EOF )
+	return NULL;
+    if ( *gerror )
+	goto bye;
+    
+    split = g_strsplit(line, SESSION_RECORD_SEPARATOR, -1);
+    if ( split[0] == NULL || split[1] == NULL || split[2] != NULL ) {
+	g_set_error(gerror, AVMON_ERROR, BAD_LINE_ERROR, "not session file format");
+	goto bye;
+    }
+    
+    sl = g_new(SessionLine, 1);
+    sl->t.tv_sec = (glong) g_ascii_strtod(split[1], NULL);
+    sl->t.tv_usec = 0;
+    if ( !g_ascii_strcasecmp(split[0], SESSION_RECORD_START) )
+	sl->indicator = SESSION_START;
+    else if ( !g_ascii_strcasecmp(split[0], SESSION_RECORD_END) )
+	sl->indicator = SESSION_END;
+    else
+	g_set_error(gerror, AVMON_ERROR, BAD_LINE_ERROR, "bad session indicator");
+    
+bye:
+    if ( line )
+	g_free(line);
+    if ( split )
+	g_strfreev(split);
+    
+    return sl;
+}
+
+/**
+ * Only returns well defined sessions, i.e., with START and END, or the ONGOING one
+ */
+static Session *
+session_next(const char *sessions_fname, Session *current, GError **gerror)
+{
+    Session *next = NULL;
+    SessionLine *sl1 = NULL, *sl2 = NULL;
+    GIOChannel *sessions = NULL;
+
+    if ( !(sessions = g_io_channel_new_file(sessions_fname, "r", gerror)) )
+	goto bye;
+
+    if ( !current ) {
+	sl = read_sessions_line(sessions, gerror);
+	
+	if ( !sl && !*gerror )
+	    goto bye; //EOF
+	if ( *gerror )
+	    goto bye;
+
+	next = g_new(Session, 1);
+	next->start = NULL;
+	next->end = NULL;
+	next->type = SESSION_UNDEFINED;
+	
+	if ( sl->indicator == SESSION_START ) {
+	    next->start = g_new(GTimeVal, 1);
+	    next->start->tv_sec = sl->t.tv_sec;
+	    next->start->tv_usec = 0;
+	    
+	    session_line_free(sl);
+	}
+
+	for ( ; ; ) {
+	    sl = read_sessions_line(sessions, gerror);
+	    if ( *gerror )
+		goto bye;
+
+	    if ( next->start ) {
+		if ( !sl && !*gerror ) {
+		    next->type = SESSION_ONGOING;
+		    goto bye;
+		}
+		if ( sl->indicator == SESSION_END ) {
+		    next->end = g_new(GTimeVal, 1);
+		    next->end->tv_sec = sl->t.tv_sec;
+		    next->end->tv_usec = 0;
+		    next->type = SESSION_MATCHED_START;
+
+		    goto bye;
+		}
+		
+		
+	
+
+
+    }
+    
+
+    if ( current ) 
+	if ( current->type == SESSION_ONGOING )
+	    goto bye;
+
+    
+    
+
+    next = g_new(Session, 1);
+    s->start = NULL;
+    s->end = NULL;
+    s->type = SESSION_UNDEFINED;
+    
+bye:
+    return next;
+}
+
+static Session *
+session_for_event(const char *sessions_fname, const GTimeVal *event_time,
+		  GError **gerror)
+{
+    Session *s = NULL;
+    SessionLine *sl = NULL, *previous = NULL;
+    GIOChannel *sessions = NULL;
+    
+    if ( !(sessions = g_io_channel_new_file(sessions_fname, "r", gerror)) )
+	goto bye;
+    
+    s = g_new(Session, 1);
+    s->start = NULL;
+    s->end = NULL;
+    s->type = SESSION_UNDEFINED;
+    
+    for ( ; ; ) {
+	sl = read_sessions_line(sessions, gerror);
+	
+	if ( !sl && !*gerror ) {
+	    if ( s->start )
+		s->type = SESSION_ONGOING;
+	    break; //EOF
+	}
+	if ( *gerror )
+	    goto bye;
+	
+	if ( sl->t.tv_sec <= event_time->tv_sec ) {
+	    switch ( sl->indicator ) {
+	    case SESSION_START:
+		if ( !s->start )
+		    s->start = g_new(GTimeVal, 1);
+
+		s->start->tv_sec = sl->t.tv_sec;
+		s->start->tv_usec = 0;
+		
+		session_line_free(sl); sl = NULL;
+		
+		break;
+	    case SESSION_END:
+		if ( !s->start ) {
+		    g_free(s->start);
+		    s->start = NULL;
+		} else if ( sl->t.tv_sec == event_time->tv_sec ) {
+		    s->end = g_new(GTimeVal, 1);
+		    s->end->tv_sec = sl->t.tv_sec;
+		    s->end->tv_usec = 0;
+
+		    s->type = SESSION_MATCHED_START;
+		    
+		    goto bye;
+		}
+		break;
+	    }
+	} else {
+	    switch ( sl->indicator ) {
+	    case SESSION_START:
+		if ( !s->start ) {
+		    //this session file has no corresponding session for the event,
+		    //session file must be broken
+		    goto bye;
+		} else {
+		    //dirty shutdown found
+		    s->type = SESSION_UNMATCHED_START;
+		    goto bye;
+		}
+		break;
+	    case SESSION_END:
+		if ( !s->start ) {
+		    //no corresponding session for the event,
+		    //session file must be broken
+		    goto bye;
+		} else {
+		    s->end = g_new(GTimeVal, 1);
+		    s->end->tv_sec = sl->t.tv_sec;
+		    s->end->tv_usec = 0;
+
+		    s->type = SESSION_MATCHED_START;
+		    
+		    goto bye;
+		}
+		break;
+	    }
+	}
+    }
+bye:
+    if ( *gerror )
+	if ( s ) {
+	    session_free(s);
+	    s = NULL;
+	}
+    if ( sl )
+	session_line_free(sl);
+    if ( sessions )
+	g_io_channel_close(sessions);
+    
+    return s;
+}
+
+//TODO: "raw availability" IO should be outside avmon.c
+#define BAD_LINE_ERROR 357
+typedef struct {
+    GTimeVal t;
+    int period;
+} RawAvLine;
+
+//EOF == !RawAvLine and !*gerror
+static RawAvLine *
+read_raw_av_line(GIOChannel *av_file, GError **gerror)
+{
+    RawAvLine *ral = NULL;
+    GIOStatus status;
+    char *line = NULL, **split = NULL;
+    
+    if ( (status = g_io_channel_read_line(av_file, &line, NULL, NULL, gerror))
+	 == G_IO_STATUS_EOF )
+	return NULL;
+    if ( *gerror )
+	goto bye;
+    
+    split = g_strsplit(line, AV_OUTPUT_SEPARATOR, -1);
+    if ( split[0] == NULL || split[1] == NULL || split[2] != NULL ) {
+	g_set_error(gerror, AVMON_ERROR, BAD_LINE_ERROR, "wrong file format");
+	goto bye;
+    }
+    
+    ral = g_new(RawAvLine, 1);
+    ral->t.tv_sec = (glong) g_ascii_strtod(split[0], NULL);
+    ral->t.tv_usec = 0;
+    ral->period = (int) g_ascii_strtod(split[1], NULL);
+    
+bye:
+    if ( line )
+	g_free(line);
+    if ( split )
+	g_strfreev(split);
+    
+    return ral;
+}
+
+double
+avmon_av_from_full_raw_availability(const char *raw_fname, const char *mon_sessions_fname,
+				    GError **gerror)
+{
+    g_assert(raw_fname != NULL);
+    g_assert(target_port != NULL);
+    
+    RawAvLine *ral;
+    GIOChannel *raw = NULL, *sessions = NULL;
+    double av = -1.0;
+    Session s = NULL;
+    
+    //read av file and then read session file until I find session that sent the ping
+
+    if ( !(raw = g_io_channel_new_file(raw_fname, "r", gerror)) )
+	goto bye;
+    if ( !(sessions = g_io_channel_new_file(mon_sessions_fname, "r", gerror)) )
+	goto bye;
+
+
+
+
+bye:
+    if ( s )
+	session_free(s);
+    if ( ral )
+	g_free(ral);
+    if ( raw )
+	g_io_channel_close(raw);
+    if ( sessions )
+	g_io_channel_close(sessions);
+    
+    return av;
+}

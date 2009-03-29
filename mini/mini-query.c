@@ -42,6 +42,16 @@ static gboolean query_raw_av = FALSE;
 static char *target_host = NULL;
 static char *target_port = NULL;
 
+static void
+av_from_raw_availabilities(GPtrArray *raw_availabilities)
+{
+    int i;
+    
+    for ( i = 0; i < raw_availabilities->len; i++ ) {
+	avmon_av_from_full_raw_availability();
+    }
+}
+
 int
 main(int argc, char **argv)
 {
@@ -121,6 +131,7 @@ main(int argc, char **argv)
 		else
 		    printf("%s\n", g_ptr_array_index(raw_availabilities, i));
 	    }
+	    av_from_raw_availabilities(raw_availabilities);
 	}
     }
 
