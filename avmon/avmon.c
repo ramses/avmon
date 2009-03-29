@@ -1564,7 +1564,8 @@ record_session_start(AVMONNode *node)
     if ( !(sessions = g_io_channel_new_file(sessions_name, "a", &gerror)) )
 	g_error("Could not open %s: %s", sessions_name, gerror->message); //aborts
 
-    buff = g_strdup_printf("%s%s%lu\n", SESSION_RECORD_START,
+    buff = g_strdup_printf("%s%s-%s%lu\n", SESSION_RECORD_START,
+			   SESSION_RECORD_SEPARATOR,
 			   SESSION_RECORD_SEPARATOR,
 			   node->session_started.tv_sec);
     g_io_channel_write_chars(sessions, buff, -1, &bytes_written, &gerror);
@@ -1847,7 +1848,9 @@ record_session_end(AVMONNode *node, gboolean ts_ok)
     }
 
     g_get_current_time(&gtv);
-    buff = g_strdup_printf("%s%s%lu\n", SESSION_RECORD_END,
+    buff = g_strdup_printf("%s%s%lu%s%lu\n", SESSION_RECORD_END,
+			   SESSION_RECORD_SEPARATOR,
+			   node->session_started.tv_sec,
 			   SESSION_RECORD_SEPARATOR, gtv.tv_sec);
     g_io_channel_write_chars(sessions, buff, -1, &bytes_written, &gerror);
     if ( gerror )
