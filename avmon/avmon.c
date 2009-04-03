@@ -2185,6 +2185,7 @@ avmon_receive_get_ts(AVMONNode *node, int socketfd)
 }
 
 //TODO: session IO should be outside avmon.c
+#define BAD_LINE_ERROR 357
 enum SessionIndicator {
     SESSION_START = 0,
     SESSION_END
@@ -2200,13 +2201,13 @@ enum SessionType {
 typedef struct {
     GTimeVal *start;
     GTimeVal *end;
-    SessionType type;
+    enum SessionType type;
 } Session;
 
 typedef struct {
     GTimeVal t;
     GTimeVal tid;
-    SessionIndicator indicator;
+    enum SessionIndicator indicator;
 } SessionLine;
 
 static void
@@ -2556,7 +2557,6 @@ bye:
 */
 
 //TODO: "raw availability" IO should be outside avmon.c
-#define BAD_LINE_ERROR 357
 typedef struct {
     GTimeVal t;
     glong period;
@@ -2652,7 +2652,7 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	}
 	//TODO: better way to compute ongoing sessions
 	//TODO: get the raw file to include last ping time?
-	max_pongs = (last->t.tv_sec - s->start->tv_sec) / ral->period;
+	max_pongs = (last - s->start->tv_sec) / ral->period;
     }
 
     av = i / (double) max_pongs;
@@ -2660,6 +2660,8 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 bye:
     if ( raw )
 	g_io_channel_close(raw);
+
+    return av;
 }
 
 double
@@ -2670,7 +2672,7 @@ avmon_av_from_full_raw_availability(const char *raw_fname, const char *mon_sessi
     g_assert(mon_sessions_fname != NULL);
     
     double av = -1.0, tmp_av;
-    Session s = NULL, s_old = NULL;
+    Session *s = NULL, *s_old = NULL;
     gboolean seen_before = FALSE;
     int i;
     
