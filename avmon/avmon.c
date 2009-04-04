@@ -1602,12 +1602,13 @@ read_previous_session_time(AVMONNode *node)
 		    gerror->message); //aborts
 	if ( status == G_IO_STATUS_EOF ) {
 	    split = g_strsplit(previous_line, SESSION_RECORD_SEPARATOR, -1);
-	    if ( split[0] == NULL || split[1] == NULL || split[2] != NULL )
-		g_error("sessions file (%s) is br0k3n", sessions_name); //aborts
+	    if ( split[0] == NULL || split[1] == NULL || split[2] == NULL || 
+		 split[3] != NULL )
+		g_error("sessions file (%s) has wrong format", sessions_name); //aborts
 	    if ( g_ascii_strncasecmp(split[0], SESSION_RECORD_END, 
 				     strlen(SESSION_RECORD_END)) )
 		goto bye;
-	    node->previous_session_end.tv_sec = (glong) g_strtod(split[1], &blah);
+	    node->previous_session_end.tv_sec = (glong) g_strtod(split[2], &blah);
 	    if ( blah[0] != '\n' )
 		g_error("sessions file (%s) is br0k3n", sessions_name); //aborts
 	    break;
