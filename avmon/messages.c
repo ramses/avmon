@@ -702,6 +702,7 @@ read_file(int socketfd, FILE *file, int timeout, GError **gerror)
 
 int
 msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
+					 const char *filename_session,
 					 int timeout, GError **gerror)
 {
     int result = 1;
@@ -709,14 +710,13 @@ msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
     FILE *file = NULL, *s_file = NULL;
     uint8_t known = 0;
     struct timeval tv;
-    char *sessions_filename = g_strconcat(filename, ".sessions", NULL);
 
     if ( !(file = fopen(filename, "w")) ) {
 	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
 			     "couldn't open output file");
 	goto bye;
     }
-    if ( !(s_file = fopen(sessions_filename, "w")) ) {
+    if ( !(s_file = fopen(filename_session, "w")) ) {
 	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_GET_RAW_AVAILABILITY_REPLY,
 			     "couldn't open output file");
 	goto bye;
@@ -752,8 +752,6 @@ bye:
 	fclose(file);
     if ( s_file )
 	fclose(s_file);
-    if ( sessions_filename )
-	g_free(sessions_filename);
 
     return result;
 }

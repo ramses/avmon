@@ -138,6 +138,7 @@ int msg_write_get_ps_reply(int socketfd, const GPtrArray *ps_array, GError **ger
 int msg_send_get_raw_availability(int socketfd, const char *target_ip, const char *target_port, GError **gerror);
 int msg_read_get_raw_availability_reply(int socketfd, GError **gerror);
 int msg_read_get_raw_availability_reply_data(int socketfd, const char *filename,
+					     const char *filename_session,
 					     int timeout, GError **gerror);
 GPtrArray *msg_read_target(int socketfd, GError **gerror);
 int msg_write_get_raw_availability_reply(int socketfd, const char *filename, 
