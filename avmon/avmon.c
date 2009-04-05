@@ -1964,6 +1964,12 @@ typedef struct {
 
 #define RAW_AV_SESSIONS_EXTENSION ".sessions"
 
+static inline char *
+sessions_fname_from_raw_av_fname(const char *raw_av_fname)
+{
+    return g_strconcat(raw_av_fname, RAW_AV_SESSIONS_EXTENSION, NULL);
+}
+
 static void *
 _avmon_get_raw_availability(void *_agrad)
 {
@@ -1973,7 +1979,7 @@ _avmon_get_raw_availability(void *_agrad)
     char *result = g_strdup_printf("%s_%s_from_%s_%s.raw", agrad->target, 
 				   agrad->target_port, agrad->monitor_ip,
 				   agrad->monitor_port);
-    char *result_session = g_strconcat(result, RAW_AV_SESSIONS_EXTENSION, NULL);
+    char *result_session = sessions_fname_from_raw_av_fname(result);
     int socketfd;
     gboolean ok = FALSE;
     fd_set rset;
