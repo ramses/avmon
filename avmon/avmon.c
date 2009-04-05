@@ -2675,8 +2675,7 @@ bye:
 }
 
 double
-avmon_av_from_full_raw_availability(const char *raw_fname, const char *mon_sessions_fname,
-				    GError **gerror)
+avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror)
 {
     g_assert(raw_fname != NULL);
     g_assert(mon_sessions_fname != NULL);
@@ -2685,6 +2684,7 @@ avmon_av_from_full_raw_availability(const char *raw_fname, const char *mon_sessi
     Session *s = NULL, *s_old = NULL;
     gboolean seen_before = FALSE;
     int i;
+    char *mon_sessions_fname = sessions_fname_from_raw_av_fname(raw_fname);
     
     for ( ; ; ) {
 	s_old = s;

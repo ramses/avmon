@@ -140,13 +140,10 @@ GPtrArray *avmon_get_raw_availability(const GPtrArray *monitors, int timeout,
  * Computes availability of process B measured by process A during its sessions.
  *
  * \param raw_fname[in] Raw availability of B as measured by A.
- * \param mon_sessions_fname[in] file with B's monitoring sessions.
  * \param gerror[out] If the function fails, *gerror will be non-NULL.
  * \return a value in [0.0, 1.0] or -1.0 if *gerror != NULL.
  */
-double avmon_av_from_full_raw_availability(const char *raw_fname,
-					   const char *mon_sessions_fname,
-					   GError **gerror);
+double avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror);
 
 AVMON_END_DECLS
 
