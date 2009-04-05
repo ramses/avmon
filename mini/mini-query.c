@@ -46,14 +46,17 @@ static void
 av_from_raw_availabilities(GPtrArray *raw_availabilities, GError **gerror)
 {
     int i;
+    double av;
     
     for ( i = 0; i < raw_availabilities->len; i++ ) {
-	avmon_av_from_full_raw_availability(g_ptr_array_index(raw_availabilities, i),
-					    gerror);
+	av = avmon_av_from_full_raw_availability(g_ptr_array_index(raw_availabilities, i),
+						 gerror);
 	if ( *gerror ) {
 	    fprintf(stderr, "%s\n", (*gerror)->message);
 	    break;
 	}
+	printf("availability from %s is %g\n", g_ptr_array_index(raw_availabilities, i),
+	       av);
     }
 }
 
