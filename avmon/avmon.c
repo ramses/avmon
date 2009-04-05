@@ -2678,7 +2678,6 @@ double
 avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror)
 {
     g_assert(raw_fname != NULL);
-    g_assert(mon_sessions_fname != NULL);
     
     double av = -1.0, tmp_av;
     Session *s = NULL, *s_old = NULL;
