@@ -48,7 +48,7 @@ av_from_raw_availabilities(GPtrArray *raw_availabilities)
     int i;
     
     for ( i = 0; i < raw_availabilities->len; i++ ) {
-	avmon_av_from_full_raw_availability();
+	avmon_av_from_full_raw_availability(g_ptr_array_index(raw_availabilities, i));
     }
 }
 
