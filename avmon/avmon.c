@@ -1962,6 +1962,14 @@ typedef struct {
     const char *target_port;
 } AVMONGetRawAvailabilityData;
 
+#define RAW_AV_SESSIONS_EXTENSION ".sessions"
+
+static inline char *
+sessions_fname_from_raw_av_fname(const char *raw_av_fname)
+{
+    return g_strconcat(raw_av_fname, RAW_AV_SESSIONS_EXTENSION, NULL);
+}
+
 static void *
 _avmon_get_raw_availability(void *_agrad)
 {
@@ -1971,6 +1979,7 @@ _avmon_get_raw_availability(void *_agrad)
     char *result = g_strdup_printf("%s_%s_from_%s_%s.raw", agrad->target, 
 				   agrad->target_port, agrad->monitor_ip,
 				   agrad->monitor_port);
+    char *result_session = sessions_fname_from_raw_av_fname(result);
     int socketfd;
     gboolean ok = FALSE;
     fd_set rset;
@@ -2007,8 +2016,8 @@ _avmon_get_raw_availability(void *_agrad)
     if ( msg_read_get_raw_availability_reply(socketfd, &gerror) )
 	goto bye;
 
-    if ( msg_read_get_raw_availability_reply_data(socketfd, result, agrad->timeout,
-						  &gerror) )
+    if ( msg_read_get_raw_availability_reply_data(socketfd, result, result_session,
+						  agrad->timeout, &gerror) )
 	goto bye;
     
     ok = TRUE;
@@ -2666,8 +2675,7 @@ bye:
 }
 
 double
-avmon_av_from_full_raw_availability(const char *raw_fname, const char *mon_sessions_fname,
-				    GError **gerror)
+avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror)
 {
     g_assert(raw_fname != NULL);
     g_assert(mon_sessions_fname != NULL);
@@ -2676,6 +2684,7 @@ avmon_av_from_full_raw_availability(const char *raw_fname, const char *mon_sessi
     Session *s = NULL, *s_old = NULL;
     gboolean seen_before = FALSE;
     int i;
+    char *mon_sessions_fname = sessions_fname_from_raw_av_fname(raw_fname);
     
     for ( ; ; ) {
 	s_old = s;
