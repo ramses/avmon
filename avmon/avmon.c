@@ -1962,6 +1962,8 @@ typedef struct {
     const char *target_port;
 } AVMONGetRawAvailabilityData;
 
+#define RAW_AV_SESSIONS_EXTENSION ".sessions"
+
 static void *
 _avmon_get_raw_availability(void *_agrad)
 {
@@ -1971,6 +1973,7 @@ _avmon_get_raw_availability(void *_agrad)
     char *result = g_strdup_printf("%s_%s_from_%s_%s.raw", agrad->target, 
 				   agrad->target_port, agrad->monitor_ip,
 				   agrad->monitor_port);
+    char *result_session = g_strconcat(result, RAW_AV_SESSIONS_EXTENSION, NULL);
     int socketfd;
     gboolean ok = FALSE;
     fd_set rset;
@@ -2007,8 +2010,8 @@ _avmon_get_raw_availability(void *_agrad)
     if ( msg_read_get_raw_availability_reply(socketfd, &gerror) )
 	goto bye;
 
-    if ( msg_read_get_raw_availability_reply_data(socketfd, result, agrad->timeout,
-						  &gerror) )
+    if ( msg_read_get_raw_availability_reply_data(socketfd, result, result_session,
+						  agrad->timeout, &gerror) )
 	goto bye;
     
     ok = TRUE;
