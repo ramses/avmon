@@ -2371,8 +2371,8 @@ session_next(const char *sessions_fname, Session *current, GError **gerror)
 	if ( *gerror ) {
 	    session_free(next);
 	    next = NULL;
+	    g_set_error(gerror, AVMON_ERROR, BAD_LINE_ERROR, "broken session file");
 	}
-	g_set_error(gerror, AVMON_ERROR, BAD_LINE_ERROR, "broken session file");
 	
 	goto bye;
     }
@@ -2613,7 +2613,7 @@ av_raw_for_session(const char *raw_fname, const Session *s,
     RawAvLine *ral = NULL;
     GIOChannel *raw = NULL;
     double av = -1.0, i;
-    glong max_pongs, last;
+    glong max_pongs, last, period;
 
     if ( !(raw = g_io_channel_new_file(raw_fname, "r", gerror)) )
 	goto bye;
@@ -2628,14 +2628,17 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	}
 	if ( *gerror )
 	    goto bye;
-	if ( ral->t.tv_sec >= s->start->tv_sec )
+	if ( ral->t.tv_sec >= s->start->tv_sec ) {
+	    period = ral->period;
+	    last = ral->t.tv_sec;
 	    break;
+	}
 	g_free(ral);
     }
 
     //IMPORTANT: ASSUMMING THAT PING PERIOD DOES NOT CHANGE WITHIN A SESSION
     if ( s->type == SESSION_MATCHED_START ) {
-	max_pongs = (s->end->tv_sec - s->start->tv_sec) / ral->period;
+	max_pongs = (s->end->tv_sec - s->start->tv_sec) / period;
 	for ( i = 1.0; ; ) {
 	    ral = read_raw_av_line(raw, gerror);
 	    if ( !ral && !*gerror )
@@ -2662,7 +2665,7 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	}
 	//TODO: better way to compute ongoing sessions
 	//TODO: get the raw file to include last ping time?
-	max_pongs = (last - s->start->tv_sec) / ral->period;
+	max_pongs = (last - s->start->tv_sec) / period;
     }
 
     av = i / (double) max_pongs;
@@ -2679,16 +2682,19 @@ avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror)
 {
     g_assert(raw_fname != NULL);
     
-    double av = -1.0, tmp_av;
+    double av = 0.0, tmp_av;
     Session *s = NULL, *s_old = NULL;
     gboolean seen_before = FALSE;
     int i;
     char *mon_sessions_fname = sessions_fname_from_raw_av_fname(raw_fname);
-    
-    for ( ; ; ) {
+
+    for ( i = 0; ; ) {
 	s_old = s;
 	s = session_next(mon_sessions_fname, s_old, gerror);
-	session_free(s_old); s_old = NULL;
+	if ( s_old ) {
+	    session_free(s_old);
+	    s_old = NULL;
+	}
 	if ( *gerror ) {
 	    av = -1.0;
 	    goto bye;
@@ -2707,7 +2713,8 @@ avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror)
 	seen_before = TRUE;
     }
 
-    av = av / ((double) i);
+    if ( i )
+	av = av / ((double) i);
 
 bye:
     if ( s )
