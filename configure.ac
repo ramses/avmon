@@ -1,5 +1,5 @@
 AC_PREREQ(2.61)
-AC_INIT([avmon], [0.1], [avmon@ramsesmorales.com])
+AC_INIT([avmon], [0.2], [avmon@ramsesmorales.com])
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_SRCDIR([avmon/avmon.c])
 AM_INIT_AUTOMAKE([1.10 foreign])
