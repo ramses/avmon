@@ -38,6 +38,7 @@
 static gboolean query_ping_set = FALSE;
 static gboolean query_target_set = FALSE;
 static gboolean query_raw_av = FALSE;
+static gboolean query_download_raw_av = FALSE;
 
 static char *target_host = NULL;
 static char *target_port = NULL;
@@ -82,7 +83,7 @@ main(int argc, char **argv)
     };
 
     context = g_option_context_new("TARGET_HOST:PORT - Tool to query nodes in an AVMON overlay.");
-    g_option_context_set_summary(context, "Copyright (C) 2007, 2008 Ramses Morales"
+    g_option_context_set_summary(context, "Copyright (C) 2007, 2008, 2009 Ramses Morales"
 				 "\nhttp://avmon.sf.net");
     g_option_context_add_main_entries(context, entries, NULL);
     g_option_context_set_help_enabled(context, TRUE);
@@ -106,7 +107,7 @@ main(int argc, char **argv)
     }
     g_option_context_free(context);
 
-    if ( query_ping_set || query_raw_av ) {
+    if ( query_ping_set || query_raw_av || query_download_raw_av  ) {
 	printf("Asking %s for its ping set... \n", argv[1]);
 	if ( !(set = avmon_get_ping_set(target_host, target_port, &gerror)) ) {
 	    fprintf(stderr, "Could not query ping set: %s\n", gerror->message);
@@ -122,7 +123,7 @@ main(int argc, char **argv)
 	}
     }
 
-    if ( query_raw_av ) {
+    if ( query_raw_av || query_download_raw_av ) {
 	if ( !set->len ) {
 	    printf("Can't query availability. %s's ping set is empty\n", argv[1]);
 	} else {
@@ -141,7 +142,8 @@ main(int argc, char **argv)
 		else
 		    printf("%s\n", g_ptr_array_index(raw_availabilities, i));
 	    }
-	    av_from_raw_availabilities(raw_availabilities, &gerror);
+	    if ( !query_download_raw_av )
+		av_from_raw_availabilities(raw_availabilities, &gerror);
 	}
     }
 
