@@ -76,6 +76,8 @@ main(int argc, char **argv)
 	 "Query target set", NULL},
 	{"raw-av", 'r', 0, G_OPTION_ARG_NONE, &query_raw_av,
 	 "Query raw availability", NULL},
+	{"d-raw-av", 'd', 0, G_OPTION_ARG_NONE, &query_download_raw_av,
+	 "Download measured raw availability", NULL},
 	{ NULL }
     };
 
