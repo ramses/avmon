@@ -305,6 +305,15 @@ avmon_peer_get_port(const AVMONPeer *peer)
     return g_strdup(peer->port);
 }
 
+glong
+avmon_peer_mon_last_heard_of(const AVMONPeer *peer)
+{
+    GTimeVal tv;
+    
+    g_get_current_time(&tv);
+    return tv.tv_sec - peer->last_mon_ping.tv_sec;
+}
+
 static gboolean
 ps_add(AVMONNode *node, AVMONPeer *peer)
 {

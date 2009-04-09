@@ -94,6 +94,14 @@ char *avmon_peer_get_ip(const AVMONPeer *peer);
 char *avmon_peer_get_port(const AVMONPeer *peer);
 
 /**
+ * returns the number of seconds the monitor last heard of the given peer
+ *
+ * @param[in] peer
+ * @return seconds
+ */
+glong avmon_peer_mon_last_heard_of(const AVMONPeer *peer);
+
+/**
  * Ask an AVMON node for its Ping Set.
  *
  * \param[in] target Host name or ip of avmon node.
