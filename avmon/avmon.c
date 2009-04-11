@@ -1703,9 +1703,15 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 	node->join_status = JOIN_STATUS_JOINING;
 	if ( avmon_join(node, gerror) ) {
 	    node->join_status = JOIN_STATUS_OUT;
+#ifdef DEBUG
+	    g_debug("I'm out");
+#endif
 	    goto exit_with_error;
 	}
 	node->join_status = JOIN_STATUS_IN;
+#ifdef DEBUG
+	g_debug("I'm in!");
+#endif
     }
 
     if ( !prepare_cache_dir(node) )
