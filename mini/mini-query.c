@@ -107,6 +107,8 @@ main(int argc, char **argv)
     }
     g_option_context_free(context);
 
+    net_init();
+
     if ( query_ping_set || query_raw_av || query_download_raw_av  ) {
 	printf("Asking %s for its ping set... \n", argv[1]);
 	if ( !(set = avmon_get_ping_set(target_host, target_port, &gerror)) ) {
