@@ -54,6 +54,10 @@ AVMON_BEGIN_DECLS
 #define MSG_ERROR_NOT_GET_LAST_HEARD_OF_TS_REPLY 12
 #define MSG_ERROR_IDS_DATA                       13
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+#define MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER    14
+#endif
+
 enum MsgDatagramTypes {
     MSG_PING           = 0X01,
     MSG_PONG           = 0X02,
@@ -106,6 +110,10 @@ typedef struct {
     uint16_t port;
     char ip[NET_IP_CHAR_SIZE + 1];
 } MsgForwardData;
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+typedef struct _MsgBOC MsgBOC;
+#endif
 
 int msg_read_type(int socketfd, uint8_t *buff, GError **gerror);
 int msg_datagram_type(const uint8_t *buffer);

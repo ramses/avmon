@@ -39,6 +39,10 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+#include <phtread.h>
+#endif
+
 #include "messages.h"
 #include "util.h"
 #include "avmon.h"
@@ -55,6 +59,137 @@ msg_error_quark(void)
     
     return quark;
 }
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+typedef struct {
+    char message_name[1024];
+    unsigned int size;
+} BocMessage;
+
+typedef struct {
+    char *message_name;
+    guint32 i;
+    guint64 bytes;
+} MessageCount;
+
+static void
+message_count_free(gpointer *mc)
+{
+    g_free(((MessageCount *) mc)->message_name);
+    g_free(mc);
+}
+
+struct _MsgBOC {
+    int boc_write_pipe;
+    int boc_read_pipe;
+    pthread_t boc_tid;
+};
+
+static void *
+message_counter(void *_msgboc)
+{
+    int err_count, boc_read_pipe = ((MsgBOC *) _msgboc)->boc_read_pipe;
+    fd_set rset;
+    BocMessage *bm = g_new(BocMessage, 1);
+    MessageCount *mc = NULL;
+    GHashTable *mtable =
+	g_hash_table_new_full(g_str_hash, g_str_equal, NULL, message_count_free);
+    
+    for ( err_count = 0; ; ) {
+	FD_ZERO(&rset);
+	FD_SET(boc_read_pipe, &rset);
+	
+	if ( select(boc_read_pipe + 1, &rset, NULL, NULL, NULL) == -1 ) {
+	    char buff[128];
+	    strerror_r(errno, buff, 127);
+	    g_warning("message counter system-level error: %s", buff);
+	    err_count++;
+	    if ( err_count == 3 )
+		exit(1);
+	    continue;
+	} else {
+	    err_count = 0;
+	}
+
+	if ( !FD_ISSET(boc_read_pipe, &rset) )
+	    g_error("message counter wtf");
+
+	if ( read(boc_read_pipe, bm, sizeof(BocMessage)) < sizeof(BocMessage) )
+	    g_error("message counter received a bad message");
+
+	if ( bm->message_name[0] == '\0' )
+	    break;
+
+	if ( !(mc = g_hash_table_lookup(mtable, b->message_name)) ) {
+	    mc = g_new(MessageCount, 1);
+	    mc->message_name = g_strdup(bm->message_name);
+	    mc->i = 0;
+	    mc->bytes = bm->size;
+	    
+	    g_hash_table_insert(mtable, mc->message_name, mc);
+	} else {
+	    mc->i++;
+	    mc->bytes += bm->size;
+	}
+	mc = NULL;
+    }
+
+    g_free(bm);
+    g_hash_table_destroy(mtable);
+
+    close(boc_read_pipe);
+    
+    pthread_exit(NULL);
+}
+
+MsgBOC *
+msg_background_overhead_counter_start(AVMONNode *node, GError **gerror)
+{
+    MsgBOC *msgboc = g_new0(MsgBOC, 1);
+    int boc_pipe[2];
+
+    if ( pipe(boc_pipe) ) {
+	util_set_error_errno(error, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
+			     "couldn't create pipe");
+	goto exit_error;
+    }
+
+    msgboc->boc_read_pipe = boc_pipe[0];
+    msgboc->boc_write_pipe = boc_pipe[1];
+
+    if ( pthread_create(&msgboc->boc_tid, NULL, message_counter, (void *) msgboc) ) {
+	close(boc_read_pipe);
+	close(boc_write_pipe);
+	goto exit_error;
+    }
+
+    return msgboc;
+    
+exit_error:
+    return NULL;
+}
+
+int
+msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
+{
+    BocMessage bm;
+
+    bm.message_name[0] = '\0';
+
+    if ( write(boc_write_pipe, &bm, sizeof(BocMessage)) == -1 ) {
+	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
+			     "overhead counter pipe");
+	return -1;
+    }
+
+    pthread_join(msgboc->boc_tid, NULL);
+    
+    //this function is called by avmon_stop after all possible message generation has been stopped
+    close(boc_write_pipe);
+
+    return 0;
+}
+#endif
 
 void
 msg_send_cv_ping(const char *peer_ip, const char *peer_port, uint16_t my_port)
