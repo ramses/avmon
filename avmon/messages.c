@@ -864,7 +864,7 @@ msg_read_get_last_heard_of_ts_reply(int socketfd, GError **gerror)
 {
     uint8_t octet;
     
-    if ( net_read_byte(socketfd, &octet gerror) )
+    if ( net_read_byte(socketfd, &octet, gerror) )
 	return 1;
     if ( octet != MSG_GET_LAST_HEARD_OF_TS_REPLY ) {
 	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_GET_LAST_HEARD_OF_TS_REPLY,
@@ -880,7 +880,7 @@ msg_extract_ids_data(int socketfd, GError **gerror)
 {
     uint16_t bytes;
     size_t count;
-    char *buff, **split, **p, *ip_c, *port_c;
+    char *buff, **split, **p, *ip_c, *port_c, *data_c;
     GPtrArray *ids_data = g_ptr_array_new();
     
     if ( net_read_16bit(socketfd, &bytes, gerror) )
@@ -897,7 +897,7 @@ msg_extract_ids_data(int socketfd, GError **gerror)
 	return NULL;
     }
 
-    p = split = g_str_split(buff, MSG_DELIMITER_S, 0);
+    p = split = g_strsplit(buff, MSG_DELIMITER_S, 0);
     g_free(buff);
 
     do {
@@ -950,7 +950,7 @@ msg_ip_port_data_list_reply(uint8_t msg_type, const GPtrArray *peer_array, const
     int i;
     uint16_t list_bytes;
     GString *string = g_string_new("");
-    MsgIPPorDatatList *mipdl = g_new(MsgIPPortDataList, 1);
+    MsgIPPortDataList *mipdl = g_new(MsgIPPortDataList, 1);
     
     if ( peer_array->len ) {
         peer = g_ptr_array_index(peer_array, 0);
@@ -958,7 +958,7 @@ msg_ip_port_data_list_reply(uint8_t msg_type, const GPtrArray *peer_array, const
         ip = avmon_peer_get_ip(peer);
         port = avmon_peer_get_port(peer);
         string = g_string_new(ip);
-        g_string_append_printf(string, "%c%s%c%s", MSG_DELIMITER_C, port, MSG_DELIMITER, data);
+        g_string_append_printf(string, "%c%s%c%s", MSG_DELIMITER_C, port, MSG_DELIMITER_C, data);
         g_free(ip);
         g_free(port);
     }
