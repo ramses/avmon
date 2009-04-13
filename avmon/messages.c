@@ -40,7 +40,8 @@
 #include <netinet/in.h>
 
 #ifdef BACKGROUND_OVERHEAD_COUNTER
-#include <phtread.h>
+#include <pthread.h>
+#include <errno.h>
 #endif
 
 #include "messages.h"
@@ -73,7 +74,7 @@ typedef struct {
 } MessageCount;
 
 static void
-message_count_free(gpointer *mc)
+message_count_free(gpointer mc)
 {
     g_free(((MessageCount *) mc)->message_name);
     g_free(mc);
@@ -120,7 +121,7 @@ message_counter(void *_msgboc)
 	if ( bm->message_name[0] == '\0' )
 	    break;
 
-	if ( !(mc = g_hash_table_lookup(mtable, b->message_name)) ) {
+	if ( !(mc = g_hash_table_lookup(mtable, bm->message_name)) ) {
 	    mc = g_new(MessageCount, 1);
 	    mc->message_name = g_strdup(bm->message_name);
 	    mc->i = 0;
@@ -149,7 +150,7 @@ msg_background_overhead_counter_start(AVMONNode *node, GError **gerror)
     int boc_pipe[2];
 
     if ( pipe(boc_pipe) ) {
-	util_set_error_errno(error, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
+	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
 			     "couldn't create pipe");
 	goto exit_error;
     }
@@ -158,8 +159,8 @@ msg_background_overhead_counter_start(AVMONNode *node, GError **gerror)
     msgboc->boc_write_pipe = boc_pipe[1];
 
     if ( pthread_create(&msgboc->boc_tid, NULL, message_counter, (void *) msgboc) ) {
-	close(boc_read_pipe);
-	close(boc_write_pipe);
+	close(msgboc->boc_read_pipe);
+	close(msgboc->boc_write_pipe);
 	goto exit_error;
     }
 
@@ -176,7 +177,7 @@ msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
 
     bm.message_name[0] = '\0';
 
-    if ( write(boc_write_pipe, &bm, sizeof(BocMessage)) == -1 ) {
+    if ( write(msgboc->boc_write_pipe, &bm, sizeof(BocMessage)) == -1 ) {
 	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
 			     "overhead counter pipe");
 	return -1;
@@ -185,7 +186,7 @@ msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
     pthread_join(msgboc->boc_tid, NULL);
     
     //this function is called by avmon_stop after all possible message generation has been stopped
-    close(boc_write_pipe);
+    close(msgboc->boc_write_pipe);
 
     return 0;
 }
