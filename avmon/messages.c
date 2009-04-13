@@ -942,7 +942,7 @@ msg_ip_port_data_list_free(MsgIPPortDataList *mipdl)
     g_free(mipdl);
 }
 
-static MsgIPPortList *
+static MsgIPPortDataList *
 msg_ip_port_data_list_reply(uint8_t msg_type, const GPtrArray *peer_array, const GPtrArray *data_array)
 {
     char *ip, *port, *data;
