@@ -64,7 +64,7 @@ msg_error_quark(void)
 #ifdef BACKGROUND_OVERHEAD_COUNTER
 typedef struct {
     char message_name[1024];
-    unsigned int size;
+    guint32 size;
 } BocMessage;
 
 typedef struct {
@@ -85,6 +85,12 @@ struct _MsgBOC {
     int boc_read_pipe;
     pthread_t boc_tid;
 };
+
+//TODO: this feature cannot be used if a single process wants to start multiple AVMON instances.
+//To do that, all the message calls would require an extra parameter, and I don't have time
+//for that right now.
+static MsgBOC *_msgboc;
+//<<<<<<<<------------
 
 static void *
 message_counter(void *_msgboc)
@@ -146,6 +152,8 @@ message_counter(void *_msgboc)
 MsgBOC *
 msg_background_overhead_counter_start(GError **gerror)
 {
+    g_assert(_msgboc == NULL); //see comment at _msgboc's definition
+    
     MsgBOC *msgboc = g_new0(MsgBOC, 1);
     int boc_pipe[2];
 
@@ -164,6 +172,8 @@ msg_background_overhead_counter_start(GError **gerror)
 	goto exit_error;
     }
 
+    _msgboc = msgboc;
+    
     return msgboc;
     
 exit_error:
@@ -193,6 +203,17 @@ msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
 
     return 0;
 }
+
+void
+msg_boc_count(const char *msg_name, guint32 size)
+{
+    BocMessage bm;
+    strncpy(bm.message_name, msg_name, 1023);
+    bm.message_name[1024] ='\0';
+    bm.size = size;
+
+    write(_msgboc->boc_write_pipe, &bm, sizeof(BocMessage));
+}
 #endif
 
 void
@@ -215,6 +236,10 @@ msg_send_cv_ping(const char *peer_ip, const char *peer_port, uint16_t my_port)
     sendto(pingfd, (void *) cv_ping_msg, MSG_CV_PING_SIZE, 0,
 	   (struct sockaddr *) &pinged_peer, sizeof(pinged_peer));
     close(pingfd);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_CV_PING", MSG_CV_PING_SIZE);
+#endif
 }
 
 void
@@ -246,6 +271,10 @@ msg_send_forward(const char *forward_ip, const char *forward_port,
 
     close(ffd);
     g_free(forward_msg);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_FORWARD", size);
+#endif
 }
 
 MsgForwardData *
@@ -286,6 +315,10 @@ msg_send_cv_fetch(int socketfd, GError **gerror)
     memcpy(&fetch_msg[0], MSG_HEAD, MSG_HEAD_SIZE);
     fetch_msg[MSG_HEAD_SIZE] = MSG_CV_FETCH;
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_CV_FETCH", MSG_CV_FETCH_SIZE);
+#endif
+
     return net_write(socketfd, &fetch_msg, MSG_CV_FETCH_SIZE, gerror);
 }
 
@@ -299,6 +332,10 @@ msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, GError **gerror)
     join_msg[MSG_HEAD_SIZE + 1] = weight;
     my_port = htons(my_port);
     memcpy(&join_msg[MSG_HEAD_SIZE + 2], &my_port, 2);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_JOIN", MSG_JOIN_SIZE);
+#endif
 
     return net_write(socketfd, &join_msg, MSG_JOIN_SIZE, gerror);
 }
@@ -342,6 +379,11 @@ msg_send_notify(const char *i_ip, const char *i_port, const char *j_ip,
 
     g_free(msg_notify);
     g_free(ids);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_NOTIFY", size);
+    msg_boc_count("MSG_NOTIFY", size);
+#endif
 }
 
 int
@@ -370,6 +412,10 @@ msg_send_monitoring_ping(const char *ip, const char *port, uint16_t my_port,
 	   (struct sockaddr *) &ping_addr, sizeof(ping_addr));
     close(pingfd);
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_PING", MSG_PING_SIZE);
+#endif
+
     return 0;
 }
 
@@ -390,6 +436,10 @@ msg_send_monitoring_pong(struct sockaddr_in *peer_addr, uint16_t peer_port,
     sendto(pongfd, (void *) pong_msg, MSG_PONG_SIZE, 0,
 	   (struct sockaddr *) peer_addr, sizeof(struct sockaddr_in));
     close(pongfd);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_PONG", MSG_PONG_SIZE);
+#endif
 }
 
 void
@@ -409,6 +459,10 @@ msg_send_cv_pong(struct sockaddr_in *peer_addr, uint16_t peer_port,
     sendto(pongfd, (void *) pong_msg, MSG_CV_PONG_SIZE, 0,
 	   (struct sockaddr *) peer_addr, sizeof(struct sockaddr_in));
     close(pongfd);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_CV_PONG", MSG_CV_PONG_SIZE);
+#endif
 }
 
 GPtrArray *
@@ -531,6 +585,11 @@ msg_write_join_reply(int socketfd, const GPtrArray *cv_array, GError **gerror)
     MsgIPPortList *mipl = msg_ip_port_list_reply(MSG_JOIN_REPLY, cv_array);
     int res = net_write(socketfd, mipl->msg, mipl->size, gerror) ? 1 : 0;
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    if ( !res )
+	msg_boc_count("MSG_JOIN_REPLY", mipl->size);
+#endif
+
     msg_ip_port_list_free(mipl);
     
     return res;
@@ -541,6 +600,11 @@ msg_write_fetch_reply(int socketfd, const GPtrArray *cv_array, GError **gerror)
 {
     MsgIPPortList *mipl = msg_ip_port_list_reply(MSG_FETCH_REPLY, cv_array);
     int res = net_write(socketfd, mipl->msg, mipl->size, gerror) ? 1 : 0;
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    if ( !res )
+	msg_boc_count("MSG_FETCH_REPLY", mipl->size);
+#endif
     
     msg_ip_port_list_free(mipl);
     
