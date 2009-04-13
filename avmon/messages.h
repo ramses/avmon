@@ -166,7 +166,7 @@ GPtrArray *msg_read_last_heard_of_ts(int socketfd, GError **gerror);
 int msg_write_get_last_heard_of_ts_reply(int socketfd, const GPtrArray *ts_array,
 					 const GPtrArray *data_array, GError **gerror);
 #ifdef BACKGROUND_OVERHEAD_COUNTER
-MsgBOC *msg_background_overhead_counter_start(AVMONNode *node, GError **gerror);
+MsgBOC *msg_background_overhead_counter_start(GError **gerror);
 int msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror);
 #endif
 

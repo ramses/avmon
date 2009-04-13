@@ -144,7 +144,7 @@ message_counter(void *_msgboc)
 }
 
 MsgBOC *
-msg_background_overhead_counter_start(AVMONNode *node, GError **gerror)
+msg_background_overhead_counter_start(GError **gerror)
 {
     MsgBOC *msgboc = g_new0(MsgBOC, 1);
     int boc_pipe[2];

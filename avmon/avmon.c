@@ -147,7 +147,7 @@ struct _AVMONNode {
     GTimeVal session_started;
     GTimeVal previous_session_end;
 
-#ifdef BACGROUND_OVERHEAD_COUNTER
+#ifdef BACKGROUND_OVERHEAD_COUNTER
     MsgBOC *msgboc;
 #endif
 };
@@ -1702,7 +1702,7 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
     }
 
 #ifdef BACKGROUND_OVERHEAD_COUNTER
-    node->msgboc = msg_background_overhead_counter_start(node, gerror);
+    node->msgboc = msg_background_overhead_counter_start(gerror);
     if ( !node->msgboc )
 	goto exit_with_error;
 #endif
