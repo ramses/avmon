@@ -2756,7 +2756,7 @@ process_ip_port_data_array(GPtrArray *array, gboolean destroy, PIPDAFunc pipda_f
     int i;
     char *ip, *port, *data;
     
-    for ( i = 0; i < array->len; i+= 2 ) {
+    for ( i = 0; i < array->len; i+= 3 ) {
 	ip = g_ptr_array_index(array, i);
 	port = g_ptr_array_index(array, i + 1);
 	data = g_ptr_array_index(array, i + 2);
@@ -2850,8 +2850,7 @@ avmon_receive_get_last_heard_of_ts(AVMONNode *node, int socketfd)
     
     msg_write_get_last_heard_of_ts_reply(socketfd, ts_array, data_array, &gerror);
 
-    for ( i = 0; i < ts_array->len; i++ ) {
+    for ( i = 0; i < ts_array->len; i++ )
 	g_free(g_ptr_array_index(data_array, i));
-	g_ptr_array_free(data_array, TRUE);
-    }
+    g_ptr_array_free(data_array, TRUE);
 }
