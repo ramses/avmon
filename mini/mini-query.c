@@ -39,6 +39,7 @@ static gboolean query_ping_set = FALSE;
 static gboolean query_target_set = FALSE;
 static gboolean query_raw_av = FALSE;
 static gboolean query_download_raw_av = FALSE;
+static gboolean query_last_heard_of_ts = FALSE;
 
 static char *target_host = NULL;
 static char *target_port = NULL;
@@ -79,6 +80,8 @@ main(int argc, char **argv)
 	 "Query raw availability", NULL},
 	{"d-raw-av", 'd', 0, G_OPTION_ARG_NONE, &query_download_raw_av,
 	 "Download measured raw availability", NULL},
+	{"lhofts", 'l', 0, G_OPTION_ARG_NONE, &query_last_heard_of_ts,
+	 "Last time this monitor heard of its target set", NULL},
 	{ NULL }
     };
 
@@ -147,6 +150,8 @@ main(int argc, char **argv)
 	}
     }
 
+    //TODO properly free stuff!!
+
     if ( query_target_set ) {
 	printf("Asking %s for its target set... \n", argv[1]);
 	if ( !(set = avmon_get_target_set(target_host, target_port, &gerror)) ) {
@@ -158,6 +163,20 @@ main(int argc, char **argv)
 	for ( i = 0; i < set->len; i++ ) {
 	    peer = g_ptr_array_index(set, i);
 	    printf("%s:%s\n", avmon_peer_get_ip(peer), avmon_peer_get_port(peer));
+	}
+    }
+
+    if ( query_last_heard_of_ts ) {
+	printf("Asking %s for the time it last heard of its target set... \n", argv[1]);
+	if ( !(set = avmon_get_last_heard_of_target_set(target_host, target_port, &gerror)) ) {
+	    fprintf(stderr, "Query failed: %s\n", gerror->message);
+	    exit(1);
+	}
+
+	for ( i = 0; i < set->len; i++ ) {
+	    peer = g_ptr_array_index(set, i);
+	    printf("heard of %s:%s %lu seconds ago\n", avmon_peer_get_ip(peer),
+		   avmon_peer_get_port(peer), avmon_peer_last_heard_of(peer));
 	}
     }
 
