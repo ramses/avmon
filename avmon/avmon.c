@@ -92,6 +92,7 @@ struct _AVMONPeer {
     GTimeVal last_mon_ping;
     GTimeVal first_session_ping;
     glong unresponsive;
+    glong last_heard_of;
 };
 
 struct _AVMONNode {
@@ -256,6 +257,7 @@ peer_new(const char *ip, const char *port)
     p->first_session_ping.tv_sec = 0;
     p->first_session_ping.tv_usec = 0;
     p->unresponsive = 0;
+    p->last_heard_of = 0;
     return p;
 }
 
@@ -303,6 +305,12 @@ char *
 avmon_peer_get_port(const AVMONPeer *peer)
 {
     return g_strdup(peer->port);
+}
+
+glong
+avmon_peer_last_heard_of(const AVMONPeer *peer)
+{
+    return peer->last_heard_of;
 }
 
 glong
@@ -2730,4 +2738,114 @@ bye:
 	session_free(s);
     
     return av;
+}
+
+typedef void (*PIPDAFunc) (const char *ip, const char *port, const char *data,
+			   void *pipda_data);
+
+static void
+process_ip_port_data_array(GPtrArray *array, gboolean destroy, PIPDAFunc pipda_func,
+			   void *pipda_data)
+{
+    int i;
+    char *ip, *port, *data;
+    
+    for ( i = 0; i < array->len; i+= 2 ) {
+	ip = g_ptr_array_index(array, i);
+	port = g_ptr_array_index(array, i + 1);
+	data = g_ptr_array_index(array, i + 2);
+	
+	pipda_func(ip, port, data, pipda_data);
+	
+	if ( destroy ) {
+	    g_free(ip);
+	    g_free(port);
+	    g_free(data);
+	}
+    }
+
+    if ( destroy )
+	g_ptr_array_free(array, TRUE);
+}
+
+static void
+_avmon_get_last_heard_of_target_set(const char *ip, const char *port, const char *data,
+				    void *array)
+{
+    AVMONPeer *peer = peer_new(ip, port);
+    peer->last_heard_of = (glong) g_ascii_strtod(data, NULL);
+    g_ptr_array_add((GPtrArray *) array, peer);
+}
+
+
+GPtrArray *
+avmon_get_last_heard_of_target_set(const char *monitor, const char *monitor_port,
+				   GError **gerror)
+{
+    g_assert(monitor != NULL);
+    g_assert(monitor_port != NULL);
+    
+    GPtrArray *array = NULL, *ip_port_data_array;
+    int socketfd;
+    struct addrinfo *ai = net_char_to_addrinfo(monitor, monitor_port, gerror);
+    if ( !ai )
+	return NULL;
+    
+    if ( (socketfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))
+	 == -1 ) {
+	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_GET_LAST_HEARD_OF,
+			     "couldn't create a socket");
+	socketfd = 0;
+	goto bye;
+    }
+
+    if ( net_connect_nb(socketfd, ai->ai_addr, ai->ai_addrlen, 5 /*TODO*/, 0, gerror) ) {
+	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_GET_LAST_HEARD_OF,
+			     "couldn't connect to monitor");
+	goto bye;
+    }
+
+    if ( msg_send_get_last_heard_of_ts(socketfd, gerror) )
+	goto bye;
+    
+    if ( msg_read_get_last_heard_of_ts_reply(socketfd, gerror) )
+	goto bye;
+
+    if ( !(ip_port_data_array = msg_read_last_heard_of_ts(socketfd, gerror)) )
+	goto bye;
+    
+    array = g_ptr_array_new();
+    process_ip_port_data_array(ip_port_data_array, TRUE, 
+			       _avmon_get_last_heard_of_target_set, array);
+
+bye:
+    if ( socketfd )
+	close(socketfd);
+    if ( ai )
+	freeaddrinfo(ai);
+    
+    return array;
+}
+
+void
+avmon_receive_get_last_heard_of_ts(AVMONNode *node, int socketfd)
+{
+    GError *gerror = NULL;
+    GPtrArray *ts_array = ts_to_array(node);
+    GPtrArray *data_array = g_ptr_array_new();
+    int i;
+    AVMONPeer *peer;
+
+    for ( i = 0; i < ts_array->len; i++ ) {
+	peer = g_ptr_array_index(ts_array, i);
+	g_ptr_array_add(data_array,
+			g_strdup_printf("%lu", avmon_peer_mon_last_heard_of(peer)));
+    }
+    
+    msg_write_get_last_heard_of_ts_reply(socketfd, ts_array, data_array, &gerror);
+
+    for ( i = 0; i < ts_array->len; i++ ) {
+	g_free(g_ptr_array_index(data_array));
+	g_ptr_array_free(data_array);
+    }
 }

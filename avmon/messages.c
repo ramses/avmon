@@ -847,3 +847,163 @@ msg_write_get_ts_reply(int socketfd, const GPtrArray *ts_array, GError **gerror)
     
     return res;
 }
+
+int
+msg_send_get_last_heard_of_ts(int socketfd, GError **gerror)
+{
+    uint8_t msg[MSG_GET_LAST_HEARD_OF_TS_SIZE];
+    
+    memcpy(msg, MSG_HEAD, MSG_HEAD_SIZE);
+    msg[MSG_HEAD_SIZE] = MSG_GET_LAST_HEARD_OF_TS;
+    
+    return net_write(socketfd, msg, MSG_GET_LAST_HEARD_OF_TS_SIZE, gerror);
+}
+
+int
+msg_read_get_last_heard_of_ts_reply(int socketfd, GError **gerror)
+{
+    uint8_t octet;
+    
+    if ( net_read_byte(socketfd, &octet gerror) )
+	return 1;
+    if ( octet != MSG_GET_LAST_HEARD_OF_TS_REPLY ) {
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_NOT_GET_LAST_HEARD_OF_TS_REPLY,
+		    "expecting %u, received %u", MSG_GET_LAST_HEARD_OF_TS_REPLY, octet);
+	return 1;
+    }
+
+    return 0;
+}
+
+GPtrArray *
+msg_extract_ids_data(int socketfd, GError **gerror)
+{
+    uint16_t bytes;
+    size_t count;
+    char *buff, **split, **p, *ip_c, *port_c;
+    GPtrArray *ids_data = g_ptr_array_new();
+    
+    if ( net_read_16bit(socketfd, &bytes, gerror) )
+	return NULL;
+
+    if ( !bytes )
+	return ids_data;
+    
+    buff = g_malloc0(sizeof(char) * bytes + 1);
+    
+    count = bytes;
+    if ( net_read(socketfd, buff, &count, gerror) ) {
+	g_free(buff);
+	return NULL;
+    }
+
+    p = split = g_str_split(buff, MSG_DELIMITER_S, 0);
+    g_free(buff);
+
+    do {
+	ip_c = *p;
+	p++;
+	port_c = *p;
+	p++;
+	data_c = *p;
+	p++;
+	
+	if ( !ip_c || !port_c || !data_c ) {
+	    g_strfreev(split);
+	    g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS_DATA, "malformed incoming IDS+data");
+	    return NULL;
+	}
+
+	g_ptr_array_add(ids_data, g_strdup(ip_c));
+	g_ptr_array_add(ids_data, g_strdup(port_c));
+	g_ptr_array_add(ids_data, g_strdup(data_c));
+    } while ( *p );
+    
+    g_strfreev(split);
+
+    return ids_data;
+}
+
+GPtrArray *
+msg_read_last_heard_of_ts(int socketfd, GError **gerror)
+{
+    return msg_extract_ids_data(socketfd, gerror);
+}
+
+typedef struct {
+    uint8_t *msg;
+    int size;
+} MsgIPPortDataList;
+
+static void
+msg_ip_port_data_list_free(MsgIPPortDataList *mipdl)
+{
+    g_free(mipdl->msg);
+    g_free(mipdl);
+}
+
+static MsgIPPortList *
+msg_ip_port_data_list_reply(uint8_t msg_type, const GPtrArray *peer_array, const GPtrArray *data_array)
+{
+    char *ip, *port, *data;
+    AVMONPeer *peer = NULL;
+    int i;
+    uint16_t list_bytes;
+    GString *string = g_string_new("");
+    MsgIPPorDatatList *mipdl = g_new(MsgIPPortDataList, 1);
+    
+    if ( peer_array->len ) {
+        peer = g_ptr_array_index(peer_array, 0);
+	data = g_ptr_array_index(data_array, 0);
+        ip = avmon_peer_get_ip(peer);
+        port = avmon_peer_get_port(peer);
+        string = g_string_new(ip);
+        g_string_append_printf(string, "%c%s%c%s", MSG_DELIMITER_C, port, MSG_DELIMITER, data);
+        g_free(ip);
+        g_free(port);
+    }
+    
+    for ( i = 1; i < peer_array->len; i++ ) {
+        peer = g_ptr_array_index(peer_array, i);
+	data = g_ptr_array_index(data_array, i);
+        ip = avmon_peer_get_ip(peer);
+        port = avmon_peer_get_port(peer);
+        g_string_append_printf(string, "%c%s%c%s%c%s",
+                               MSG_DELIMITER_C, ip, MSG_DELIMITER_C, port,
+			       MSG_DELIMITER_C, data);
+        g_free(ip);
+        g_free(port);
+    }
+
+    mipdl->size = 1 + 2;
+    if ( peer_array->len ) {
+        list_bytes = string->len;
+        list_bytes = htons(list_bytes);
+        mipdl->size += string->len;
+    } else {
+        list_bytes = 0;
+    }
+
+    mipdl->msg = (uint8_t *) g_malloc(mipdl->size);
+    mipdl->msg[0] = msg_type;
+    memcpy(&mipdl->msg[1], &list_bytes, 2);
+    if ( string->len )
+        memcpy(&mipdl->msg[1 + 2], string->str, string->len);
+
+    g_string_free(string, TRUE);
+
+    return mipdl;
+}
+
+int
+msg_write_get_last_heard_of_ts_reply(int socketfd, const GPtrArray *ts_array, 
+				     const GPtrArray *data_array, GError **gerror)
+{
+    MsgIPPortDataList *mipdl =
+	msg_ip_port_data_list_reply(MSG_GET_LAST_HEARD_OF_TS_REPLY, ts_array, data_array);
+    int res = net_write(socketfd, mipdl->msg, mipdl->size, gerror) ? 1 : 0;
+    
+    msg_ip_port_data_list_free(mipdl);
+    
+    return res;
+}

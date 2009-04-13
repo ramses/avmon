@@ -201,6 +201,22 @@ handle_get_raw_availability(void *args)
     pthread_exit(NULL);
 }
 
+static void *
+handle_get_last_heard_of_ts(void *args)
+{
+    PacketHandlerArgs *pargs = (PacketHandlerArgs *) args;
+    
+    pthread_detach(pthread_self());
+    
+    avmon_receive_get_last_heard_of_ts(pargs->al->node, pargs->connection_fd);
+    
+    util_counter_dec(pargs->al->tcp_thread_count);
+    
+    g_free(args);
+    
+    pthread_exit(NULL);
+}
+
 extern void avmon_receive_monitoring_ping(AVMONNode *node, const uint8_t *buff,
 					  struct sockaddr_in *cliaddr);
 
@@ -327,12 +343,13 @@ static hp datagram_handlers[6] = {
     handle_forward
 };
 
-static hp packet_handlers[5] = {
+static hp packet_handlers[6] = {
     handle_join,
     handle_cv_fetch,
     handle_get_ps,
     handle_get_raw_availability,
-    handle_get_ts
+    handle_get_ts,
+    handle_get_last_heard_of_ts
 };
 
 static void *

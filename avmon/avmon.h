@@ -45,6 +45,7 @@ AVMON_BEGIN_DECLS
 #define AVMON_ERROR_STOP   5
 #define AVMON_ERROR_INTRODUCER_CLOSED 6
 #define AVMON_ERROR_GET_TS 7
+#define AVMON_ERROR_GET_LAST_HEARD_OF 8
 
 #define AVMON_INTRODUCER_NONE "none"
 
@@ -92,6 +93,11 @@ char *avmon_peer_get_ip(const AVMONPeer *peer);
  * @return peer's port. Don't forget to free after use.
  */
 char *avmon_peer_get_port(const AVMONPeer *peer);
+
+/**
+ * Only use this after calling avmon_get_last_heard_of_target_set()
+ */
+glong avmon_peer_last_heard_of(const AVMONPeer *peer);
 
 /**
  * returns the number of seconds the monitor last heard of the given peer
@@ -152,6 +158,18 @@ GPtrArray *avmon_get_raw_availability(const GPtrArray *monitors, int timeout,
  * \return a value in [0.0, 1.0] or -1.0 if *gerror != NULL.
  */
 double avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror);
+
+/**
+ *
+ * \param[in] monitor Host name or ip of avmon node.
+ * \param[in] monitor_port avmon port of avmon node.
+ * \param[out] gerror If something goes wrong, *gerror will be non-NULL.
+ * \return Returns GPtrArray populated with AVMONPeer. Can be empty. NULL only
+ * if error. Call avmon_peer_last_heard_of on each AVMONPeer. Free array and elements
+ * after use.
+ */
+GPtrArray *avmon_get_last_heard_of_target_set(const char *monitor, const char *monitor_port,
+					      GError **gerror);
 
 AVMON_END_DECLS
 

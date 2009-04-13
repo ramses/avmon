@@ -51,6 +51,8 @@ AVMON_BEGIN_DECLS
 #define MSG_ERROR_IP                             9
 #define MSG_ERROR_INVALID_PACKET_TYPE            10
 #define MSG_ERROR_NOT_GET_TS_REPLY               11
+#define MSG_ERROR_NOT_GET_LAST_HEARD_OF_TS_REPLY 12
+#define MSG_ERROR_IDS_DATA                       13
 
 enum MsgDatagramTypes {
     MSG_PING           = 0X01,
@@ -67,16 +69,18 @@ enum MsgPacketType {
     MSG_CV_FETCH             = 0X02,
     MSG_GET_PS               = 0X03,
     MSG_GET_RAW_AVAILABILITY = 0X04,
-    MSG_GET_TS               = 0X05
+    MSG_GET_TS               = 0X05,
+    MSG_GET_LAST_HEARD_OF_TS = 0X06
 };
 
 enum MsgPacketReplyType {
-    MSG_JOIN_REPLY                 = 0X06,
-    MSG_FETCH_REPLY                = 0X07,
-    MSG_GET_PS_REPLY               = 0X08,
-    MSG_GET_RAW_AVAILABILITY_REPLY = 0X09,
-    MSG_GET_TS_REPLY               = 0X0A,
-    MSG_NOT_A_PACKET               = 0X0B
+    MSG_JOIN_REPLY                 = 0X07,
+    MSG_FETCH_REPLY                = 0X08,
+    MSG_GET_PS_REPLY               = 0X09,
+    MSG_GET_RAW_AVAILABILITY_REPLY = 0X0A,
+    MSG_GET_TS_REPLY               = 0X0B,
+    MSG_NOT_A_PACKET               = 0X0C,
+    MSG_GET_LAST_HEARD_OF_TS_REPLY = 0X0D
 };
 
 extern const char *MSG_HEAD;
@@ -90,6 +94,7 @@ extern const char *MSG_HEAD;
 #define MSG_CV_FETCH_SIZE (8+1)
 #define MSG_GET_PS_SIZE   (8+1)
 #define MSG_GET_TS_SIZE   (8+1)
+#define MSG_GET_LAST_HEARD_OF_TS_SIZE (8+1)
 
 #define MSG_GET_RAW_AVAILABILITY_REPLY_HEAD_SIZE (1 + 1)
     
@@ -147,6 +152,11 @@ int msg_send_get_ts(int socketfd, GError **gerror);
 int msg_read_get_ts_reply(int socketfd, GError **gerror);
 GPtrArray *msg_read_ts(int socketfd, GError **gerror);
 int msg_write_get_ts_reply(int socketfd, const GPtrArray *ts_array, GError **gerror);
+int msg_send_get_last_heard_of_ts(int socketfd, GError **gerror);
+int msg_read_get_last_heard_of_ts_reply(int socketfd, GError **gerror);
+GPtrArray *msg_read_last_heard_of_ts(int socketfd, GError **gerror);
+int msg_write_get_last_heard_of_ts_reply(int socketfd, const GPtrArray *ts_array,
+					 const GPtrArray *data_array, GError **gerror);
 
 AVMON_END_DECLS
 
