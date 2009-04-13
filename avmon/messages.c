@@ -188,6 +188,9 @@ msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
     //this function is called by avmon_stop after all possible message generation has been stopped
     close(msgboc->boc_write_pipe);
 
+    g_free(msgboc);
+    msgboc = NULL;
+
     return 0;
 }
 #endif

@@ -146,6 +146,10 @@ struct _AVMONNode {
 
     GTimeVal session_started;
     GTimeVal previous_session_end;
+
+#ifdef BACGROUND_OVERHEAD_COUNTER
+    MsgBOC *msgboc;
+#endif
 };
 
 static inline int
@@ -637,6 +641,10 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
     node->session_first_ts_ping = TRUE;
 
     g_get_current_time(&node->session_started);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    node->msgboc = NULL;
+#endif
 
     return node;
 
@@ -1693,6 +1701,12 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 	evp_set = TRUE;
     }
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    node->msgboc = msg_background_overhead_counter_start(node, gerror);
+    if ( !node->msgboc )
+	goto exit_with_error;
+#endif
+
     //listener
 #ifdef DEBUG
     g_debug("starting listener");
@@ -1909,6 +1923,11 @@ avmon_stop(AVMONNode *node, GError **gerror)
     pthread_join(node->tid, NULL);
 
     record_session_end(node, save_sets(node));
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    if ( msg_background_overhead_counter_quit(node->msgboc, gerror) )
+	return -1;
+#endif
     
     avmon_node_free(node);
 
