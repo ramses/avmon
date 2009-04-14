@@ -54,6 +54,10 @@ AVMON_BEGIN_DECLS
 #define MSG_ERROR_NOT_GET_LAST_HEARD_OF_TS_REPLY 12
 #define MSG_ERROR_IDS_DATA                       13
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+#define MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER    14
+#endif
+
 enum MsgDatagramTypes {
     MSG_PING           = 0X01,
     MSG_PONG           = 0X02,
@@ -107,6 +111,10 @@ typedef struct {
     char ip[NET_IP_CHAR_SIZE + 1];
 } MsgForwardData;
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+typedef struct _MsgBOC MsgBOC;
+#endif
+
 int msg_read_type(int socketfd, uint8_t *buff, GError **gerror);
 int msg_datagram_type(const uint8_t *buffer);
 int msg_read_head(int socketfd, GError **gerror);
@@ -157,6 +165,11 @@ int msg_read_get_last_heard_of_ts_reply(int socketfd, GError **gerror);
 GPtrArray *msg_read_last_heard_of_ts(int socketfd, GError **gerror);
 int msg_write_get_last_heard_of_ts_reply(int socketfd, const GPtrArray *ts_array,
 					 const GPtrArray *data_array, GError **gerror);
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+MsgBOC *msg_background_overhead_counter_start(GError **gerror);
+int msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror);
+void msg_background_overhead_counter_log(void);
+#endif
 
 AVMON_END_DECLS
 

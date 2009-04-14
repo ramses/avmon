@@ -39,6 +39,11 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+#include <pthread.h>
+#include <errno.h>
+#endif
+
 #include "messages.h"
 #include "util.h"
 #include "avmon.h"
@@ -55,6 +60,184 @@ msg_error_quark(void)
     
     return quark;
 }
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+typedef struct {
+    char message_name[1024];
+    guint32 size;
+} BocMessage;
+
+typedef struct {
+    char *message_name;
+    guint32 i;
+    guint64 bytes;
+} MessageCount;
+
+static void
+message_count_free(gpointer mc)
+{
+    g_free(((MessageCount *) mc)->message_name);
+    g_free(mc);
+}
+
+struct _MsgBOC {
+    int boc_write_pipe;
+    int boc_read_pipe;
+    pthread_t boc_tid;
+};
+
+//TODO: this feature cannot be used if a single process wants to start multiple AVMON instances.
+//To do that, all the message calls would require an extra parameter, and I don't have time
+//for that right now.
+static MsgBOC *_msgboc;
+//<<<<<<<<------------
+
+static BocMessage ask_counter_log;
+static BocMessage ask_counter_quit;
+
+static void
+counter_log(gpointer _m_name, gpointer _m_count, gpointer ignore_me)
+{
+    MessageCount *mc = (MessageCount *) _m_count;
+    g_message("message %s, count %u, bytes %llu\n", mc->message_name, mc->i,
+	      mc->bytes);
+}
+
+static void *
+message_counter(void *_msgboc)
+{
+    int err_count, boc_read_pipe = ((MsgBOC *) _msgboc)->boc_read_pipe;
+    fd_set rset;
+    BocMessage *bm = g_new(BocMessage, 1);
+    MessageCount *mc = NULL;
+    GHashTable *mtable =
+	g_hash_table_new_full(g_str_hash, g_str_equal, NULL, message_count_free);
+    
+    for ( err_count = 0; ; ) {
+	FD_ZERO(&rset);
+	FD_SET(boc_read_pipe, &rset);
+	
+	if ( select(boc_read_pipe + 1, &rset, NULL, NULL, NULL) == -1 ) {
+	    char buff[128];
+	    strerror_r(errno, buff, 127);
+	    g_warning("message counter system-level error: %s", buff);
+	    err_count++;
+	    if ( err_count == 3 )
+		exit(1);
+	    continue;
+	} else {
+	    err_count = 0;
+	}
+
+	if ( !FD_ISSET(boc_read_pipe, &rset) )
+	    g_error("message counter wtf");
+
+	if ( read(boc_read_pipe, bm, sizeof(BocMessage)) < sizeof(BocMessage) )
+	    g_error("message counter received a bad message");
+
+	if ( !strcmp(bm->message_name, ask_counter_quit.message_name) )
+	    break;
+
+	if ( !strcmp(bm->message_name, ask_counter_log.message_name) ) {
+	    g_hash_table_foreach(mtable, counter_log, NULL);
+	    continue;
+	}
+
+	if ( !(mc = g_hash_table_lookup(mtable, bm->message_name)) ) {
+	    mc = g_new(MessageCount, 1);
+	    mc->message_name = g_strdup(bm->message_name);
+	    mc->i = 0;
+	    mc->bytes = bm->size;
+	    
+	    g_hash_table_insert(mtable, mc->message_name, mc);
+	} else {
+	    mc->i++;
+	    mc->bytes += bm->size;
+	}
+	mc = NULL;
+    }
+
+    g_free(bm);
+    g_hash_table_destroy(mtable);
+
+    close(boc_read_pipe);
+    
+    pthread_exit(NULL);
+}
+
+MsgBOC *
+msg_background_overhead_counter_start(GError **gerror)
+{
+    g_assert(_msgboc == NULL); //see comment at _msgboc's definition
+    
+    MsgBOC *msgboc = g_new0(MsgBOC, 1);
+    int boc_pipe[2];
+
+    if ( pipe(boc_pipe) ) {
+	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
+			     "couldn't create pipe");
+	goto exit_error;
+    }
+
+    msgboc->boc_read_pipe = boc_pipe[0];
+    msgboc->boc_write_pipe = boc_pipe[1];
+
+    if ( pthread_create(&msgboc->boc_tid, NULL, message_counter, (void *) msgboc) ) {
+	close(msgboc->boc_read_pipe);
+	close(msgboc->boc_write_pipe);
+	goto exit_error;
+    }
+
+    _msgboc = msgboc;
+
+    ask_counter_log.message_name[0] = 'l';
+    ask_counter_log.message_name[1] = '\0';
+    ask_counter_quit.message_name[0] = 'q';
+    ask_counter_quit.message_name[1] = '\0';
+    
+    return msgboc;
+    
+exit_error:
+    return NULL;
+}
+
+int
+msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
+{
+    if ( write(msgboc->boc_write_pipe, &ask_counter_quit, sizeof(BocMessage)) == -1 ) {
+	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
+			     "overhead counter pipe");
+	return -1;
+    }
+
+    pthread_join(msgboc->boc_tid, NULL);
+    
+    //this function is called by avmon_stop after all possible message generation has been stopped
+    close(msgboc->boc_write_pipe);
+
+    g_free(msgboc);
+    msgboc = NULL;
+
+    return 0;
+}
+
+void
+msg_boc_count(const char *msg_name, guint32 size)
+{
+    BocMessage bm;
+    strncpy(bm.message_name, msg_name, 1023);
+    bm.message_name[1024] ='\0';
+    bm.size = size;
+
+    write(_msgboc->boc_write_pipe, &bm, sizeof(BocMessage));
+}
+
+void
+msg_background_overhead_counter_log(void)
+{
+    write(_msgboc->boc_write_pipe, &ask_counter_log, sizeof(BocMessage));
+}
+#endif
 
 void
 msg_send_cv_ping(const char *peer_ip, const char *peer_port, uint16_t my_port)
@@ -76,6 +259,10 @@ msg_send_cv_ping(const char *peer_ip, const char *peer_port, uint16_t my_port)
     sendto(pingfd, (void *) cv_ping_msg, MSG_CV_PING_SIZE, 0,
 	   (struct sockaddr *) &pinged_peer, sizeof(pinged_peer));
     close(pingfd);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_CV_PING", MSG_CV_PING_SIZE);
+#endif
 }
 
 void
@@ -107,6 +294,10 @@ msg_send_forward(const char *forward_ip, const char *forward_port,
 
     close(ffd);
     g_free(forward_msg);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_FORWARD", size);
+#endif
 }
 
 MsgForwardData *
@@ -147,6 +338,10 @@ msg_send_cv_fetch(int socketfd, GError **gerror)
     memcpy(&fetch_msg[0], MSG_HEAD, MSG_HEAD_SIZE);
     fetch_msg[MSG_HEAD_SIZE] = MSG_CV_FETCH;
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_CV_FETCH", MSG_CV_FETCH_SIZE);
+#endif
+
     return net_write(socketfd, &fetch_msg, MSG_CV_FETCH_SIZE, gerror);
 }
 
@@ -160,6 +355,10 @@ msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, GError **gerror)
     join_msg[MSG_HEAD_SIZE + 1] = weight;
     my_port = htons(my_port);
     memcpy(&join_msg[MSG_HEAD_SIZE + 2], &my_port, 2);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_JOIN", MSG_JOIN_SIZE);
+#endif
 
     return net_write(socketfd, &join_msg, MSG_JOIN_SIZE, gerror);
 }
@@ -203,6 +402,11 @@ msg_send_notify(const char *i_ip, const char *i_port, const char *j_ip,
 
     g_free(msg_notify);
     g_free(ids);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_NOTIFY", size);
+    msg_boc_count("MSG_NOTIFY", size);
+#endif
 }
 
 int
@@ -231,6 +435,10 @@ msg_send_monitoring_ping(const char *ip, const char *port, uint16_t my_port,
 	   (struct sockaddr *) &ping_addr, sizeof(ping_addr));
     close(pingfd);
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_PING", MSG_PING_SIZE);
+#endif
+
     return 0;
 }
 
@@ -251,6 +459,10 @@ msg_send_monitoring_pong(struct sockaddr_in *peer_addr, uint16_t peer_port,
     sendto(pongfd, (void *) pong_msg, MSG_PONG_SIZE, 0,
 	   (struct sockaddr *) peer_addr, sizeof(struct sockaddr_in));
     close(pongfd);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_PONG", MSG_PONG_SIZE);
+#endif
 }
 
 void
@@ -270,6 +482,10 @@ msg_send_cv_pong(struct sockaddr_in *peer_addr, uint16_t peer_port,
     sendto(pongfd, (void *) pong_msg, MSG_CV_PONG_SIZE, 0,
 	   (struct sockaddr *) peer_addr, sizeof(struct sockaddr_in));
     close(pongfd);
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_boc_count("MSG_CV_PONG", MSG_CV_PONG_SIZE);
+#endif
 }
 
 GPtrArray *
@@ -392,6 +608,11 @@ msg_write_join_reply(int socketfd, const GPtrArray *cv_array, GError **gerror)
     MsgIPPortList *mipl = msg_ip_port_list_reply(MSG_JOIN_REPLY, cv_array);
     int res = net_write(socketfd, mipl->msg, mipl->size, gerror) ? 1 : 0;
 
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    if ( !res )
+	msg_boc_count("MSG_JOIN_REPLY", mipl->size);
+#endif
+
     msg_ip_port_list_free(mipl);
     
     return res;
@@ -402,6 +623,11 @@ msg_write_fetch_reply(int socketfd, const GPtrArray *cv_array, GError **gerror)
 {
     MsgIPPortList *mipl = msg_ip_port_list_reply(MSG_FETCH_REPLY, cv_array);
     int res = net_write(socketfd, mipl->msg, mipl->size, gerror) ? 1 : 0;
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+    if ( !res )
+	msg_boc_count("MSG_FETCH_REPLY", mipl->size);
+#endif
     
     msg_ip_port_list_free(mipl);
     
