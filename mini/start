@@ -1,0 +1,5 @@
+# !/bin/bash
+
+#see sample1.conf and mini-monitor.c:
+#
+echo "|start$" > mini-monitor.pipe

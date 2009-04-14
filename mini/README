@@ -1,0 +1,37 @@
+mini-monitor is a sample monitoring application to illustrate how to use the
+avmon library. 
+
+Running mini-monitor:
+=====================
+
+$ mini-monitor -c configuration-file.conf &    (1)
+$ ./start                                      (2)
+$ ./stop                                       (3)
+$ ./start                                      (4)
+$ ./quit                                       (5)
+
+(1) run mini-monitor as a background process
+(2) sends a message to mini-monitor's named pipe, telling it to join an avmon
+    overlay
+(3) sends a message to mini-monitor's named pipe, telling it to leave the
+    previously joined overlay
+(4) rejoin the overlay
+(5) mini-monitor leaves the overlay and then exits
+
+
+Configuration:
+==============
+sample1.conf shows how to configure mini-monitor to be the very first node in
+an avmon overlay.  Notice that the node used to "join" the overlay is called
+"none."
+
+sample2.conf shows how to configure mini-monitor to join an existing avmon
+overlay.
+
+N = the approximate number of peers in the monitoring overlay. Future versions
+will automagically estimate it.
+
+K = usually c * log_2(N) for some constant c. The number of monitors per node
+is on average K.
+
+Please read the papers linked from http://avmon.sf.net for details.
