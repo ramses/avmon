@@ -40,6 +40,12 @@ AVMON_BEGIN_DECLS
 #define CONF_ERROR       conf_error_quark()
 #define CONF_ERROR_VALUE 1
 
+enum ConfSessionFixMethod {
+    CONF_SESSION_FIX_NONE = 0,
+    CONF_SESSION_FIX_CURRENT_TIME,
+    CONF_SESSION_FIX_YOUNGUEST_RAW_AV
+};
+
 typedef struct _Conf Conf;
 
 Conf *conf_load(const char *fname, GError **gerror);
@@ -60,6 +66,7 @@ int conf_get_introducer_timeout(Conf *conf);
  */
 char *conf_get_host_ip(Conf *conf);
 gboolean conf_enable_forgetful_pinging(Conf *conf);
+ConfSessionFixMethod conf_get_session_fix_method(Conf *conf);
 
 AVMON_END_DECLS
 

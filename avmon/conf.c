@@ -53,6 +53,12 @@
 //CONF_PERIOD
 #define CONF_default_av_output_prefix  "default_av_output_prefix"
 
+#define CONF_GROUP_SESSION               "session"
+#define CONF_fix_missing_end_method      "fix_missing_end_method"
+#define CONF_fix_method_younguest_raw_av "younguest_raw_av"
+#define CONF_fix_method_current_time     "current_time"
+#define CONF_fix_method_none             "none"
+
 #define CONF_MAX_PORT         65535
 
 GQuark
@@ -79,6 +85,8 @@ struct _Conf {
 
     int monitoring_period;
     char *default_av_output_prefix;
+
+    ConfSessionFixMethod csfm;
 };
 
 void
@@ -191,6 +199,28 @@ conf_load(const char *fname, GError **gerror)
 			      CONF_default_av_output_prefix, gerror);
     if ( *gerror )
 	goto exit_with_error;
+
+    //SESSION CONF
+    if ( g_key_file_has_group(gkf, CONF_GROUP_SESSION) ) {
+	gchar *method = g_key_file_get_string(gkf, CONF_GROUP_SESSION,
+					      CONF_fix_missing_end_method);
+	if ( !method )
+	    conf->csfm = CONF_SESSION_FIX_NONE;
+	else {
+	    if ( !g_ascii_strcasecmp(method, CONF_fix_method_none) )
+		conf->csfm = CONF_SESSION_FIX_NONE;
+	    else if ( !g_ascii_strcasecmp(method, CONF_fix_method_younguest_raw_av) )
+		conf->csfm = CONF_SESSION_FIX_YOUNGUEST_RAW_AV;
+	    else if ( !g_ascii_strcasecmp(method, CONF_fix_method_current_time) )
+		conf->csfm = CONF_SESSION_FIX_CURRENT_TIME;
+	    else
+		g_set_error(gerror, CONF_ERROR, CONF_ERROR_VALUE,
+			    "bad session fix method %s\n", method);
+	    g_free(method);
+	}
+    } else {
+	conf->csfm = CONF_SESSION_FIX_NONE;
+    }
         
     //
     g_key_file_free(gkf);
@@ -268,4 +298,10 @@ gboolean
 conf_enable_forgetful_pinging(Conf *conf)
 {
     return conf->enable_forgetful_pinging;
+}
+
+ConfSessionFixMethod
+conf_get_session_fix_method(Conf *conf)
+{
+    return conf->csfm;
 }
