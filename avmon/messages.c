@@ -92,6 +92,17 @@ struct _MsgBOC {
 static MsgBOC *_msgboc;
 //<<<<<<<<------------
 
+static BocMessage ask_counter_log;
+static BocMessage ask_counter_quit;
+
+static void
+counter_log(gpointer _m_name, gpointer _m_count, gpointer ignore_me)
+{
+    MessageCount *mc = (MessageCount *) _m_count;
+    g_message("message %s, count %lu, bytes %lu\n", mc->message_name, mc->i,
+	      mc->bytes);
+}
+
 static void *
 message_counter(void *_msgboc)
 {
@@ -124,8 +135,13 @@ message_counter(void *_msgboc)
 	if ( read(boc_read_pipe, bm, sizeof(BocMessage)) < sizeof(BocMessage) )
 	    g_error("message counter received a bad message");
 
-	if ( bm->message_name[0] == '\0' )
+	if ( !g_strcmp0(bm->message_name, ask_counter_quit.message_name) )
 	    break;
+
+	if ( !g_strcmp0(bm->message_name, ask_counter_log.message_name) ) {
+	    g_hash_table_foreach(mtable, counter_log, NULL);
+	    continue;
+	}
 
 	if ( !(mc = g_hash_table_lookup(mtable, bm->message_name)) ) {
 	    mc = g_new(MessageCount, 1);
@@ -173,6 +189,11 @@ msg_background_overhead_counter_start(GError **gerror)
     }
 
     _msgboc = msgboc;
+
+    ask_counter_log.message_name[0] = 'l';
+    ask_counter_log.message_name[1] = '\0';
+    ask_counter_quit.message_name[0] = 'q';
+    ask_counter_quit.message_name[1] = '\0';
     
     return msgboc;
     
@@ -183,11 +204,7 @@ exit_error:
 int
 msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror)
 {
-    BocMessage bm;
-
-    bm.message_name[0] = '\0';
-
-    if ( write(msgboc->boc_write_pipe, &bm, sizeof(BocMessage)) == -1 ) {
+    if ( write(msgboc->boc_write_pipe, &ask_counter_quit, sizeof(BocMessage)) == -1 ) {
 	util_set_error_errno(gerror, MSG_ERROR, MSG_ERROR_BACKGROUND_OVERHEAD_COUNTER,
 			     "overhead counter pipe");
 	return -1;
@@ -213,6 +230,12 @@ msg_boc_count(const char *msg_name, guint32 size)
     bm.size = size;
 
     write(_msgboc->boc_write_pipe, &bm, sizeof(BocMessage));
+}
+
+void
+msg_background_overhead_counter_log(void)
+{
+    write(_msgboc->boc_write_pipe, &ask_counter_log, sizeof(BocMessage));
 }
 #endif
 

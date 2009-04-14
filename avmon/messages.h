@@ -168,6 +168,7 @@ int msg_write_get_last_heard_of_ts_reply(int socketfd, const GPtrArray *ts_array
 #ifdef BACKGROUND_OVERHEAD_COUNTER
 MsgBOC *msg_background_overhead_counter_start(GError **gerror);
 int msg_background_overhead_counter_quit(MsgBOC *msgboc, GError **gerror);
+void msg_background_overhead_counter_log(void);
 #endif
 
 AVMON_END_DECLS
