@@ -1268,6 +1268,10 @@ main_loop(void *_node)
 	} else {
 	    g_ptr_array_free(incoming_cv, TRUE);
 	}
+
+#ifdef BACKGROUND_OVERHEAD_COUNTER
+	msg_background_overhead_counter_log();
+#endif
     }
 
 #ifdef DEBUG
@@ -1925,6 +1929,7 @@ avmon_stop(AVMONNode *node, GError **gerror)
     record_session_end(node, save_sets(node));
 
 #ifdef BACKGROUND_OVERHEAD_COUNTER
+    msg_background_overhead_counter_log();
     if ( msg_background_overhead_counter_quit(node->msgboc, gerror) )
 	return -1;
 #endif
