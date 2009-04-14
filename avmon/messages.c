@@ -99,7 +99,7 @@ static void
 counter_log(gpointer _m_name, gpointer _m_count, gpointer ignore_me)
 {
     MessageCount *mc = (MessageCount *) _m_count;
-    g_message("message %s, count %lu, bytes %lu\n", mc->message_name, mc->i,
+    g_message("message %s, count %u, bytes %llu\n", mc->message_name, mc->i,
 	      mc->bytes);
 }
 
@@ -135,10 +135,10 @@ message_counter(void *_msgboc)
 	if ( read(boc_read_pipe, bm, sizeof(BocMessage)) < sizeof(BocMessage) )
 	    g_error("message counter received a bad message");
 
-	if ( !g_strcmp0(bm->message_name, ask_counter_quit.message_name) )
+	if ( !strcmp(bm->message_name, ask_counter_quit.message_name) )
 	    break;
 
-	if ( !g_strcmp0(bm->message_name, ask_counter_log.message_name) ) {
+	if ( !strcmp(bm->message_name, ask_counter_log.message_name) ) {
 	    g_hash_table_foreach(mtable, counter_log, NULL);
 	    continue;
 	}
