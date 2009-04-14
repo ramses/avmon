@@ -14,4 +14,6 @@ mini_monitor_LDADD   = $(top_builddir)/avmon/libavmon.la
 mini_query_SOURCES   = mini-query.c
 mini_query_LDADD     = $(top_builddir)/avmon/libavmon.la $(GLIB_LIBS)
 
+EXTRA_DIST = start stop quit sample1.conf sample2.conf
+
 LDFLAGS = -static
