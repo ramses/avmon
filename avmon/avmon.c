@@ -1606,14 +1606,29 @@ record_session_start(AVMONNode *node)
     g_io_channel_close(sessions);
 }
 
+//TODO: all session file management crap should be outside avmon.c
+static void
+verify_split_session_line(const char **split) 
+{
+    if ( split[0] == NULL || split[1] == NULL || split[2] == NULL ||
+	 split[3] != NULL ) {
+	g_error("corrupt sessions file"); //aborts
+    }
+    if ( g_ascii_strncasecmp(split[0], SESSION_RECORD_START, strlen(SESSION_RECORD_START))
+	 && g_ascii_strncasecmp(split[0], SESSION_RECORD_END, strlen(SESSION_RECORD_END)) )
+	g_error("corrupt sessions file");
+    //TODO: check more stuff
+}
+
 static void
 read_previous_session_time(AVMONNode *node)
 {
     GError *gerror = NULL;
-    char *line = NULL, *previous_line = NULL, **split = NULL, *blah = NULL;
+    char *line1 = NULL, *line2 = NULL, **split1 = NULL, **split2 = NULL,
+	*blah = NULL;
     GIOStatus status;
     char *sessions_name = avmon_sessions_file_name(node);
-    GIOChannel *sessions = g_io_channel_new_file(sessions_name, "r", &gerror);
+    GIOChannel *sessions = g_io_channel_new_file(sessions_name, "r+", &gerror);
 
     node->previous_session_end.tv_sec = 0;
 
@@ -1624,6 +1639,7 @@ read_previous_session_time(AVMONNode *node)
 	else
 	    goto bye;
     }
+/*
     for ( ; ; ) {
 	status = g_io_channel_read_line(sessions, &line, NULL, NULL, &gerror);
 	if ( gerror )
@@ -1647,17 +1663,130 @@ read_previous_session_time(AVMONNode *node)
 	    g_free(previous_line);
 	previous_line = line;
     }
+*/
+    for ( ; ; ) {
+	status = g_io_channel_read_line(sessions, &line3, NULL, NULL, &gerror);
+	if ( gerror )
+	    g_error("error reading sessions (%s): %s", sessions_name,
+		    gerror->message);
+	if ( status == G_IO_STATUS_EOF ) {
+	    if ( !line1 && !line2 ) //empty sessions file
+		goto bye;
+
+	    split1= g_strsplit(line1, SESSION_RECORD_SEPARATOR, -1);
+	    verify_split_session_line(split1);
+
+	    split2 = g_strsplit(line2, SESSION_RECORD_SEPARATOR, -1);
+	    verify_split_session_line(split2);
+
+	    if ( !g_ascii_strncasecmp(split1[0], SESSION_RECORD_START,
+				      strlen(SESSION_RECORD_START)) &&
+		 !g_ascii_strncasecmp(split2[0], SESSION_RECORD_END,
+				      strlen(SESSION_RECORD_END)) ) {
+		node->previous_session_end.tv_sec = (glong) g_strtod(split2[2], 
+								     &blah);
+		if ( blah[0] != '\n' )
+		    g_error("sessions file (%s) is br0k3n", sessions_name); //aborts
+		goto bye;
+	    }
+
+	    //END followed by END....
+
+	    g_error("sessions file (%s) is br0k3n", sessions_name); //aborts
+
+	    //TODO: I'm aborting here because currently "raw availability measurement"
+	    //is assumed -- in fact, it is the only that can be used as of now. 
+	    //One thing to do would be to erase raw measurements that do
+	    //not fall inside valid recorded sessions, and then erase the dangling
+	    //session end.
+	    //
+	    //TODO: As soon as other availability measurements are allowed, this
+	    //should be revised. It might be that the session file won't even matter at all
+	    //with a different user provided availability monitor.
+	    
+	    //..or START followed by START, or END followed by START
+	}
+
+	if ( line1 ) {
+	    g_free(line1);
+	    line1 = NULL;
+	}
+	if ( line2 ) {
+	    g_free(line2);
+	    line2 = NULL;
+	}
+
+	//finish reading (expected) START/END pair
+	line1 = line3;
+	status = g_io_channel_read_line(sessions, &line2, NULL, NULL, &gerror);
+	if ( gerror )
+	    g_error("error reading sessions (%s): %s", sessions_name,
+		    gerror->message);
+	if ( status == G_IO_STATUS_EOF ) {
+	    split1 = g_strsplit(line1, SESSION_RECORD_SEPARATOR, -1);
+	    verify_split_session_line(split1);
+
+	    if ( g_ascii_strncasecmp(split1[0], SESSION_RECORD_START,
+				     strlen(SESSION_RECORD_START)) ) {
+		g_error("sessions file (%s) is br0k3n", sessions_name);
+		//TODO: read previous TODO comment
+	    }
+
+	    //previous session didn't finish cleanly
+	    switch ( conf_get_session_fix_method(node->conf) ) {
+	    case CONF_SESSION_FIX_NONE:
+		g_error("session file (%s) is missing an entry for the end of"
+			"the previous session", sessions_name);
+		//TODO: read previous TODO comment
+		break;
+	    case CONF_SESSION_FIX_CURRENT_TIME:
+		GTimeVal ct;
+		char *buff;
+		gsize bytes_written;
+		g_get_current_time(&ct);
+		sleep(1); //I'm being lazy here :-p
+		buff = g_strdup_printf("%s%s%s%s%lu\n", SESSION_RECORD_END,
+				       SESSION_RECORD_SEPARATOR, split1[2],
+				       SESSION_RECORD_SEPARATOR, ct.tv_sec);
+		g_io_channel_write_chars(sessions, buff, -1, &bytes_written,
+					 &gerror);
+		if ( gerror )
+		    g_critical("Could not write to %s: %s", sessions_name,
+			       gerror->message);
+		g_free(buff);
+		g_warning("session END %s is an auto-fix", split1[2]);
+
+		node->previous_session_end.tv_sec = ct.tv_sec;
+		goto bye;
+		
+		break;
+	    case CONF_SESSION_FIX_YOUNGEST_RAW_AV:
+		g_error("fixing a session using youngest raw availability is"
+			"not yet implemented");
+		//TODO: this is going to be a pain, the previous fix should
+		//be good for now.
+		break;
+	    }
+	}
+
+	g_free(line3);
+	line3 = NULL;
+    }
 
 bye:
     g_free(sessions_name);
     if ( sessions )
 	g_io_channel_close(sessions);
-    if ( line )
-	g_free(line);
-    if ( previous_line )
-	g_free(previous_line);
-    if ( split )
-	g_strfreev(split);
+    if ( line1 )
+	g_free(line1);
+    if ( line2 )
+	g_free(line2);
+    if ( line3 )
+	g_free(line3);
+    if ( split1 )
+	g_strfreev(split2);
+    if ( split2 )
+	g_strfreev(split2);
 }
 
 /**
