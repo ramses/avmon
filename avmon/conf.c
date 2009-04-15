@@ -86,7 +86,7 @@ struct _Conf {
     int monitoring_period;
     char *default_av_output_prefix;
 
-    ConfSessionFixMethod csfm;
+    enum ConfSessionFixMethod csfm;
 };
 
 void
@@ -203,7 +203,7 @@ conf_load(const char *fname, GError **gerror)
     //SESSION CONF
     if ( g_key_file_has_group(gkf, CONF_GROUP_SESSION) ) {
 	gchar *method = g_key_file_get_string(gkf, CONF_GROUP_SESSION,
-					      CONF_fix_missing_end_method);
+					      CONF_fix_missing_end_method, gerror);
 	if ( !method )
 	    conf->csfm = CONF_SESSION_FIX_NONE;
 	else {
@@ -300,7 +300,7 @@ conf_enable_forgetful_pinging(Conf *conf)
     return conf->enable_forgetful_pinging;
 }
 
-ConfSessionFixMethod
+enum ConfSessionFixMethod
 conf_get_session_fix_method(Conf *conf)
 {
     return conf->csfm;

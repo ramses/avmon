@@ -66,7 +66,7 @@ int conf_get_introducer_timeout(Conf *conf);
  */
 char *conf_get_host_ip(Conf *conf);
 gboolean conf_enable_forgetful_pinging(Conf *conf);
-ConfSessionFixMethod conf_get_session_fix_method(Conf *conf);
+enum ConfSessionFixMethod conf_get_session_fix_method(Conf *conf);
 
 AVMON_END_DECLS
 

@@ -1608,7 +1608,7 @@ record_session_start(AVMONNode *node)
 
 //TODO: all session file management crap should be outside avmon.c
 static void
-verify_split_session_line(const char **split) 
+verify_split_session_line(char **split) 
 {
     if ( split[0] == NULL || split[1] == NULL || split[2] == NULL ||
 	 split[3] != NULL ) {
@@ -1624,11 +1624,14 @@ static void
 read_previous_session_time(AVMONNode *node)
 {
     GError *gerror = NULL;
-    char *line1 = NULL, *line2 = NULL, **split1 = NULL, **split2 = NULL,
-	*blah = NULL;
+    char *line1 = NULL, *line2 = NULL, *line3 = NULL, **split1 = NULL,
+	**split2 = NULL, *blah = NULL;
     GIOStatus status;
     char *sessions_name = avmon_sessions_file_name(node);
     GIOChannel *sessions = g_io_channel_new_file(sessions_name, "r+", &gerror);
+    GTimeVal ct;
+    char *buff;
+    gsize bytes_written;
 
     node->previous_session_end.tv_sec = 0;
 
@@ -1740,9 +1743,6 @@ read_previous_session_time(AVMONNode *node)
 		//TODO: read previous TODO comment
 		break;
 	    case CONF_SESSION_FIX_CURRENT_TIME:
-		GTimeVal ct;
-		char *buff;
-		gsize bytes_written;
 		g_get_current_time(&ct);
 		sleep(1); //I'm being lazy here :-p
 		buff = g_strdup_printf("%s%s%s%s%lu\n", SESSION_RECORD_END,
@@ -1760,7 +1760,7 @@ read_previous_session_time(AVMONNode *node)
 		goto bye;
 		
 		break;
-	    case CONF_SESSION_FIX_YOUNGEST_RAW_AV:
+	    case CONF_SESSION_FIX_YOUNGUEST_RAW_AV:
 		g_error("fixing a session using youngest raw availability is"
 			"not yet implemented");
 		//TODO: this is going to be a pain, the previous fix should
