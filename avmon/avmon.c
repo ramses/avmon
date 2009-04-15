@@ -1745,6 +1745,7 @@ read_previous_session_time(AVMONNode *node)
 	    case CONF_SESSION_FIX_CURRENT_TIME:
 		g_get_current_time(&ct);
 		sleep(1); //I'm being lazy here :-p
+		util_eliminate_newline(split1[2]);
 		buff = g_strdup_printf("%s%s%s%s%lu\n", SESSION_RECORD_END,
 				       SESSION_RECORD_SEPARATOR, split1[2],
 				       SESSION_RECORD_SEPARATOR, ct.tv_sec);
@@ -1769,7 +1770,6 @@ read_previous_session_time(AVMONNode *node)
 	    }
 	}
 
-	g_free(line3);
 	line3 = NULL;
     }
 
@@ -1779,12 +1779,12 @@ bye:
 	g_io_channel_close(sessions);
     if ( line1 )
 	g_free(line1);
+    else if ( line3 )
+	g_free(line3);
     if ( line2 )
 	g_free(line2);
-    if ( line3 )
-	g_free(line3);
     if ( split1 )
-	g_strfreev(split2);
+	g_strfreev(split1);
     if ( split2 )
 	g_strfreev(split2);
 }
