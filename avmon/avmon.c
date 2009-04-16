@@ -330,6 +330,12 @@ avmon_peer_mon_last_heard_of(const AVMONPeer *peer)
     return tv.tv_sec - peer->last_mon_ping.tv_sec;
 }
 
+static inline int
+ps_size(AVMONNode *node)
+{
+    return g_hash_table_size(node->ps);
+}
+
 static gboolean
 ps_add(AVMONNode *node, AVMONPeer *peer)
 {
