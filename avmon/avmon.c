@@ -101,6 +101,10 @@ struct _AVMONNode {
     GHashTable *cv;
     int CVS;
     AVMONPeer *pinged_peer;
+    
+    int periods_uncontacted;
+    int periods_till_contacted;
+    gboolean contacted_this_period;
 
     GHashTable *ps;
     GHashTable *ts;
@@ -577,6 +581,9 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
     node->ts = g_hash_table_new_full(g_str_hash, g_str_equal, NULL, _ts_destroy);
 
     node->CVS = 4 * ((int) pow((double) N, 0.25));
+    node->periods_till_contacted = (int) ceil(sqrt((double) N) / 16.0);
+    node->periods_uncontacted = 0;
+    node->contacted_this_period = FALSE;
 
     pthread_mutex_init(&node->mutex_pinged_peer, NULL);
     pthread_mutex_init(&node->mutex_cv, NULL);
@@ -1054,6 +1061,8 @@ avmon_receive_cv_fetch(AVMONNode *node, int socketfd)
 	g_error_free(gerror);
     }
     g_ptr_array_free(array, TRUE);
+
+    node->contacted_this_period = TRUE;
 }
 
 void
@@ -1120,6 +1129,77 @@ monitoring_loop(void *_node)
 #endif
 
     pthread_exit(NULL);
+}
+
+static void *
+_send_fake_join(void *_node)
+{
+    int i, sockfd = -1;
+    fd_set rset;
+    struct addrinfo *ai = NULL;
+    struct timeval tv;
+    GError *gerror = NULL;
+    GPtrArray *incoming_cv = NULL;
+    AVMONNode *node = (AVMONNode *) _node;
+    AVMONPeer *peer = NULL;
+
+    pthread_detach(pthread_self());
+
+    if ( !(peer = cv_random_peer(node)) )
+	goto bye;
+
+    if ( !(ai = net_char_to_addrinfo(peer->ip, peer->port, &gerror)) )
+	goto bye;
+    if ( (sockfd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol))
+	 == -1 )
+	goto bye;
+    if ( net_connect_nb(sockfd, ai->ai_addr, ai->ai_addrlen, 5 /* TODO? */, 0,
+			&gerror) )
+	goto bye;
+
+    if ( msg_send_join(sockfd, node->CVS, node->port, &gerror) )
+	goto bye;
+    
+    tv.tv_sec = 5; /*TODO?*/
+    tv.tv_usec = 0;
+    FD_ZERO(&rset);
+    FD_SET(sockfd, &rset);
+    if ( select(sockfd + 1, &rset, NULL, NULL, &tv) == -1 ) 
+	goto bye;
+    if ( !FD_ISSET(sockfd, &rset) )
+	goto bye;
+    
+    if ( msg_read_join_reply(sockfd, &gerror) )
+	goto bye;
+    incoming_cv = msg_read_cv(sockfd, &gerror);
+    //TODO: use this to fill empty spaces in the CV
+
+    if ( incoming_cv ) {
+	for ( i = 0; i < incoming_cv->len; i++ )
+	    g_free(g_ptr_array_index(incoming_cv, i));
+	g_ptr_array_free(incoming_cv, TRUE);
+    }
+
+bye:
+    if ( sockfd > 0 )
+	close(sockfd);
+    if ( ai )
+	freeaddrinfo(ai);
+    if ( gerror )
+	g_error_free(gerror);
+
+    pthread_exit(NULL);
+}
+
+static void
+send_fake_join(AVMONNode *node)
+{
+    pthread_t tid;
+    pthread_attr_t thread_attr;
+    pthread_attr_init(&thread_attr);
+    pthread_attr_setdetachstate(&thread_attr, PTHREAD_CREATE_DETACHED);
+    
+    pthread_create(&tid, &thread_attr, _send_fake_join, (void *) node);
 }
 
 static void *
@@ -1267,6 +1347,17 @@ main_loop(void *_node)
 	    avmon_compute_and_shuffle(node, incoming_cv, random_peer);
 	} else {
 	    g_ptr_array_free(incoming_cv, TRUE);
+	}
+
+	if ( node->contacted_this_period ) {
+	    node->periods_uncontacted = 0;
+	    node->contacted_this_period = FALSE;
+	} else {
+	    node->periods_uncontacted++;
+	    if ( node->periods_uncontacted > node->periods_till_contacted ) {
+		send_fake_join(node);
+		node->periods_uncontacted = 0;
+	    }
 	}
 
 #ifdef BACKGROUND_OVERHEAD_COUNTER
