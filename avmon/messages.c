@@ -112,6 +112,7 @@ message_counter(void *_msgboc)
     MessageCount *mc = NULL;
     GHashTable *mtable =
 	g_hash_table_new_full(g_str_hash, g_str_equal, NULL, message_count_free);
+    guint64 sum_messages = 0, sum_bytes = 0;
     
     for ( err_count = 0; ; ) {
 	FD_ZERO(&rset);
@@ -140,6 +141,7 @@ message_counter(void *_msgboc)
 
 	if ( !strcmp(bm->message_name, ask_counter_log.message_name) ) {
 	    g_hash_table_foreach(mtable, counter_log, NULL);
+	    g_message("total count %llu\n, total bytes %llu");
 	    continue;
 	}
 
@@ -154,6 +156,8 @@ message_counter(void *_msgboc)
 	    mc->i++;
 	    mc->bytes += bm->size;
 	}
+	sum_messages++;
+	sum_bytes += bm->size;
 	mc = NULL;
     }
 
