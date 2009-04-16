@@ -38,6 +38,7 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <glib.h>
+#include <pthread.h>
 
 #include <avmon/avmon.h>
 
@@ -65,6 +66,8 @@ static int n_pipe, ignore_me;
 
 static GHashTable *exec_table = NULL;
 typedef void (*Func) (void);
+
+static pthread_mutex_t mutex_log = PTHREAD_MUTEX_INITIALIZER;
 
 static void
 log_func(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message,
@@ -106,7 +109,9 @@ log_func(const gchar *log_domain, GLogLevelFlags log_level, const gchar *message
 
     g_string_append_printf(string, "%s\n", message);
 
+    pthread_mutex_lock(&mutex_log);
     fprintf(log, "%s", string->str);
+    pthread_mutex_unlock(&mutex_log);
     g_string_free(string, TRUE);
     
     if ( log_level == G_LOG_LEVEL_ERROR )
