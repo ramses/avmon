@@ -122,7 +122,7 @@ int msg_read_join_reply(int socketfd, GError **gerror);
 int msg_read_join_payload(int socketfd, uint16_t *peer_port, uint8_t *weight,
 			  GError **gerror);
 int msg_send_cv_fetch(int socketfd, GError **gerror);
-int msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, GError **gerror);
+int msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, gboolean fake, GError **gerror);
 void msg_send_notify(const char *i_ip, const char *i_port, const char *j_ip,
 		     const char *j_port);
 void msg_send_cv_ping(const char *peer_ip, const char *peer_port, uint16_t my_port);

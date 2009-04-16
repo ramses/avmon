@@ -1157,7 +1157,7 @@ _send_fake_join(void *_node)
 			&gerror) )
 	goto bye;
 
-    if ( msg_send_join(sockfd, node->CVS, node->port, &gerror) )
+    if ( msg_send_join(sockfd, node->CVS, node->port, TRUE, &gerror) )
 	goto bye;
     
     tv.tv_sec = 5; /*TODO?*/
@@ -1410,7 +1410,7 @@ avmon_join(AVMONNode *node, GError **gerror)
     if ( node->CVS > 255 )
 	g_error("Currently join's weight is limited to 8bit"); //this abort()s
     //TODO
-    if ( msg_send_join(sockfd, node->CVS, node->port, gerror) )
+    if ( msg_send_join(sockfd, node->CVS, node->port, FALSE, gerror) )
 	goto bye;
 
     FD_ZERO(&rset);

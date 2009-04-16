@@ -346,7 +346,8 @@ msg_send_cv_fetch(int socketfd, GError **gerror)
 }
 
 int
-msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, GError **gerror)
+msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, gboolean fake,
+	      GError **gerror)
 {
     uint8_t join_msg[MSG_JOIN_SIZE];
     
@@ -357,7 +358,10 @@ msg_send_join(int socketfd, uint8_t weight, uint16_t my_port, GError **gerror)
     memcpy(&join_msg[MSG_HEAD_SIZE + 2], &my_port, 2);
 
 #ifdef BACKGROUND_OVERHEAD_COUNTER
-    msg_boc_count("MSG_JOIN", MSG_JOIN_SIZE);
+    if ( !fake )
+	msg_boc_count("MSG_JOIN", MSG_JOIN_SIZE);
+    else
+	msg_boc_count("MSG_JOIN_F", MSG_JOIN_SIZE);
 #endif
 
     return net_write(socketfd, &join_msg, MSG_JOIN_SIZE, gerror);
