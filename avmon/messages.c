@@ -225,7 +225,7 @@ void
 msg_boc_count(const char *msg_name, guint32 size)
 {
     BocMessage bm;
-    memset(&bm, 0, sizeof(BocMessage);
+    memset(&bm, 0, sizeof(BocMessage));
     strncpy(bm.message_name, msg_name, 1023);
     bm.size = size;
 
