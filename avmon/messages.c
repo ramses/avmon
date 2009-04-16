@@ -146,7 +146,7 @@ message_counter(void *_msgboc)
 	if ( !(mc = g_hash_table_lookup(mtable, bm->message_name)) ) {
 	    mc = g_new(MessageCount, 1);
 	    mc->message_name = g_strdup(bm->message_name);
-	    mc->i = 0;
+	    mc->i = 1;
 	    mc->bytes = bm->size;
 	    
 	    g_hash_table_insert(mtable, mc->message_name, mc);
@@ -225,8 +225,8 @@ void
 msg_boc_count(const char *msg_name, guint32 size)
 {
     BocMessage bm;
+    memset(&bm, 0, sizeof(BocMessage);
     strncpy(bm.message_name, msg_name, 1023);
-    bm.message_name[1024] ='\0';
     bm.size = size;
 
     write(_msgboc->boc_write_pipe, &bm, sizeof(BocMessage));
