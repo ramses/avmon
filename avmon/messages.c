@@ -99,7 +99,7 @@ static void
 counter_log(gpointer _m_name, gpointer _m_count, gpointer ignore_me)
 {
     MessageCount *mc = (MessageCount *) _m_count;
-    g_message("message %s, count %u, bytes %llu\n", mc->message_name, mc->i,
+    g_message("message %s, count %u, bytes %llu", mc->message_name, mc->i,
 	      mc->bytes);
 }
 
@@ -113,6 +113,9 @@ message_counter(void *_msgboc)
     GHashTable *mtable =
 	g_hash_table_new_full(g_str_hash, g_str_equal, NULL, message_count_free);
     guint64 sum_messages = 0, sum_bytes = 0;
+    GTimeVal start, current;
+    
+    g_get_current_time(&start);
     
     for ( err_count = 0; ; ) {
 	FD_ZERO(&rset);
@@ -140,8 +143,10 @@ message_counter(void *_msgboc)
 	    break;
 
 	if ( !strcmp(bm->message_name, ask_counter_log.message_name) ) {
+	    g_get_current_time(&current);
 	    g_hash_table_foreach(mtable, counter_log, NULL);
-	    g_message("total count %llu\n, total bytes %llu");
+	    g_message("total count %llu, total bytes %llu, time %lu",
+		      sum_messages, sum_bytes, current.tv_sec - start.tv_sec);
 	    continue;
 	}
 
