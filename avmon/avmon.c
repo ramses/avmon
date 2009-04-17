@@ -327,7 +327,7 @@ avmon_peer_mon_last_heard_of(const AVMONPeer *peer)
     GTimeVal tv;
     
     g_get_current_time(&tv);
-    return tv.tv_sec - peer->last_mon_ping.tv_sec;
+    return tv.tv_sec - peer->last_mon_ping_answered.tv_sec;
 }
 
 static inline int
