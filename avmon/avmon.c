@@ -2954,8 +2954,7 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	    //take care of a new node that first appeared during
 	    //an ongoing session
 	    max_pongs = (last - first) / period;
-	    if ( !max_pongs )
-		max_pongs = 1; 
+	    max_pongs++;
 	}
     }
 
