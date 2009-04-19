@@ -458,8 +458,9 @@ avmon_default_av_output_function(AVMONNode *node, AVMONPeer *peer)
 static void
 avmon_default_monitor_reply(AVMONNode *node, AVMONPeer *peer)
 {
+    g_get_current_time(&peer->last_mon_ping_answered);
+
     if ( node->enable_forgetful_pinging ) {
-	g_get_current_time(&peer->last_mon_ping_answered);
 	if ( peer->unresponsive ) {
 	    peer->unresponsive = 0;
 	    peer->first_session_ping.tv_sec = peer->last_mon_ping.tv_sec;
