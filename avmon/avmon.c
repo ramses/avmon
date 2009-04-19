@@ -2902,6 +2902,14 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	if ( *gerror )
 	    goto bye;
 	if ( ral->t.tv_sec >= s->start->tv_sec ) {
+	    if ( s->type == SESSION_MATCHED_START ) {
+		if ( ral->t.tv_sec > s->end->tv_sec ) {
+		    if ( seen_before )
+			av = 0.0;
+		    goto bye;
+		}
+	    }
+	    //ONGOING or ral->t.tv_sec <= s->end->tv_sec :
 	    period = ral->period;
 	    last = ral->t.tv_sec;
 	    break;
