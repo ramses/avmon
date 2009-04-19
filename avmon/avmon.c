@@ -2935,6 +2935,7 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	    g_free(ral);
 	}
     } else { //ONGOING
+	glong first = last;
 	for ( i = 1.0; ; ) {
 	    ral = read_raw_av_line(raw, gerror);
 	    if ( !ral && !*gerror )
@@ -2947,7 +2948,15 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 	}
 	//TODO: better way to compute ongoing sessions
 	//TODO: get the raw file to include last ping time?
-	max_pongs = (last - s->start->tv_sec) / period;
+	if ( seen_before )
+	    max_pongs = (last - s->start->tv_sec) / period;
+	else {
+	    //take care of a new node that first appeared during
+	    //an ongoing session
+	    max_pongs = (last - first) / period;
+	    if ( !max_pongs )
+		max_pongs = 1; 
+	}
     }
 
     av = i / (double) max_pongs;
