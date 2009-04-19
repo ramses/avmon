@@ -2981,9 +2981,16 @@ avmon_av_from_full_raw_availability(const char *raw_fname, GError **gerror)
 	    goto bye;
 	}
 
-	av += tmp_av;
-	i++;
-	seen_before = TRUE;
+	if ( seen_before ) {
+	    av += tmp_av;
+	    i++;
+	} else if ( tmp_av > 0 ) {
+	    av = tmp_av;
+	    i++;
+	    seen_before = TRUE;
+
+	    //tmp_av == -1.0 if not seen before and no trace of the target in a session
+	}
     }
 
     if ( i )
