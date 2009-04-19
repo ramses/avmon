@@ -2920,7 +2920,12 @@ av_raw_for_session(const char *raw_fname, const Session *s,
 
     //IMPORTANT: ASSUMMING THAT PING PERIOD DOES NOT CHANGE WITHIN A SESSION
     if ( s->type == SESSION_MATCHED_START ) {
-	max_pongs = (s->end->tv_sec - s->start->tv_sec) / period;
+	if ( seen_before )
+	    max_pongs = (s->end->tv_sec - s->start->tv_sec) / period;
+	else {
+	    max_pongs = (s->end->tv_sec - last) / period;
+	    max_pongs++;
+	}
 	for ( i = 1.0; ; ) {
 	    ral = read_raw_av_line(raw, gerror);
 	    if ( !ral && !*gerror )
