@@ -170,6 +170,8 @@ net_connect_nb(int socketfd, struct sockaddr *peer_addr, int peer_addr_size,
 	sel = select(maxfd, &rset, &wset, NULL, &tv);
 	if ( !sel ) {
 	    result = 1;
+	    g_set_error(gerror, NET_ERROR, NET_ERROR_TIMEOUT,
+			"timeout trying to connect");
 	    goto bye;
 	}
 	if ( sel == -1 ) {
@@ -180,6 +182,8 @@ net_connect_nb(int socketfd, struct sockaddr *peer_addr, int peer_addr_size,
 	if ( timeoutfd )
 	    if ( FD_ISSET(timeoutfd, &rset) ) {
 		result = 1;
+		g_set_error(gerror, NET_ERROR, NET_ERROR_TIMEOUT,
+			    "timeout trying to connect");
 		goto bye;
 	    }
 
