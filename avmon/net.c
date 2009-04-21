@@ -90,8 +90,9 @@ net_read(int fd, void *buff, size_t *count, GError **gerror)
 		return -1;
 	    }
 	} else if ( bytes_read == 0 ) {
+	    //this will usually happen after catching SIGPIPE
 	    g_set_error(gerror, NET_ERROR, NET_ERROR_ZERO, "net_read");
-	    return 0;
+	    return -1;
 	} else {
 	    *count -= bytes_read;
 	    buff_pointer += bytes_read;
