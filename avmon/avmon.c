@@ -100,7 +100,6 @@ struct _AVMONNode {
     long double condition;
     GHashTable *cv;
     int CVS;
-    AVMONPeer *pinged_peer;
     
     int periods_uncontacted;
     int periods_till_contacted;
@@ -121,13 +120,17 @@ struct _AVMONNode {
     Conf *conf;
     pthread_t tid;
     pthread_t m_tid;
+    pthread_t p_tid;
 
     AVMONListener *listener;
 
     int main_pipe[2];
     int monitoring_pipe[2];
+    int pp_write_pipe;
+    int pp_read_pipe;
+    int pp_write_answer_pipe;
+    int pp_read_answer_pipe;
 
-    pthread_mutex_t mutex_pinged_peer;
     pthread_mutex_t mutex_cv;
     pthread_mutex_t mutex_ps;
     pthread_mutex_t mutex_ts;
@@ -548,6 +551,14 @@ avmon_node_free(AVMONNode *node)
 	close(node->monitoring_pipe[0]);
 	close(node->monitoring_pipe[1]);
     }
+    if ( node->pp_write_pipe != -1 ) {
+	close(node->pp_write_pipe);
+	close(node->pp_read_pipe);
+    }
+    if ( node->pp_read_answer_pipe != -1 ) {
+	close(node->pp_write_answer_pipe);
+	close(node->pp_read_answer_pipe);
+    }
 
     g_free(node->ip_c);
     g_free(node->port_c);
@@ -592,7 +603,6 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
     node->periods_uncontacted = 0;
     node->contacted_this_period = FALSE;
 
-    pthread_mutex_init(&node->mutex_pinged_peer, NULL);
     pthread_mutex_init(&node->mutex_cv, NULL);
     pthread_mutex_init(&node->mutex_ps, NULL);
     pthread_mutex_init(&node->mutex_ts, NULL);
@@ -611,6 +621,9 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
     if ( node->port > 65535 )
 	g_error("bad port number %d", node->port); //aborts
     node->key = cv_key(node->ip_c, node->port_c);
+
+    node->pp_read_pipe = node->pp_write_pipe = node->pp_read_answer_pipe =
+	node->pp_write_answer_pipe = -1;
 
     //non-blocking pipes
     node->main_pipe[0] = node->main_pipe[1] = node->monitoring_pipe[0] = 
@@ -646,6 +659,26 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
 	util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_NODE,
 			     "creating pipe");
         goto exit_with_error;
+    }
+
+    //
+    {
+	int pp_pipes[2];
+	if ( pipe(pp_pipes) ) {
+	    util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_NODE,
+				 "creating pipe");
+	    goto exit_with_error;
+	}
+	node->pp_read_pipe = pp_pipes[0];
+	node->pp_write_pipe = pp_pipes[1];
+
+	if ( pipe(pp_pipes) ) {
+	    util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_NODE,
+				 "creating pipe");
+	    goto exit_with_error;
+	}
+	node->pp_read_answer_pipe = pp_pipes[0];
+	node->pp_write_answer_pipe = pp_pipes[1];
     }
 
     node->peer_trash = g_ptr_array_new();
@@ -869,6 +902,143 @@ bye:
     g_free(peer_port_c);
 }
 
+enum PingedPeerMessageType {
+    PP_PINGED = 0,
+    PP_PONG,
+    PP_ANSWERED,
+    PP_EXIT
+};
+
+typedef struct {
+    char *key;
+    enum PingedPeerMessageType t;
+} PingedPeerMessage;
+
+typedef struct {
+    gboolean answered;
+} PingedPeerAnswer;
+
+typedef struct {
+    char *key;
+    gboolean answered;
+} PingedPeer;
+
+static void *
+pinged_peer_loop(void *_node) 
+{
+    AVMONNode *node = (AVMONNode *) _node;
+    fd_set rset;
+    PingedPeerMessage *ppm = g_new(PingedPeerMessage, 1);
+    PingedPeer pp;
+    PingedPeerAnswer pa;
+    pp.key = NULL;
+    pp.answered = FALSE;
+    
+    for ( ; ; ) {
+	FD_ZERO(&rset);
+	FD_SET(node->pp_read_pipe, &rset);
+
+	if ( select(node->pp_read_pipe + 1, &rset, NULL, NULL, NULL) == -1 ) {
+	    char buff[128];
+	    strerror_r(errno, buff, 127);
+	    g_critical("%s", buff);
+	    exit(1);
+	}
+
+	if ( !FD_ISSET(node->pp_read_pipe, &rset) )
+	    g_error("pinged_peer_loop wtf");
+
+	if ( read(node->pp_read_pipe, ppm, sizeof(PingedPeerMessage))
+	     < sizeof(PingedPeerMessage) )
+	    g_error("pinged_peer_loop received a bad message");
+
+	switch ( ppm->t ) {
+	case PP_EXIT:
+	    if ( pp.key )
+		g_free(pp.key);
+	    
+	    goto exit;
+	    break;
+	case PP_PINGED:
+	    if ( pp.key )
+		g_free(pp.key);
+	    
+	    pp.key = g_strdup(ppm->key);
+	    pp.answered = FALSE;
+	    break;
+	case PP_PONG:
+	    if ( pp.key ) {
+		if ( !strcmp(pp.key, ppm->key) )
+		    pp.answered = TRUE;
+	    }
+	    break;
+	case PP_ANSWERED:
+	    if ( pp.key ) {
+		if ( !strcmp(pp.key, ppm->key) ) {
+		    pa.answered = pp.answered;
+
+		    g_free(pp.key);
+		    pp.key = NULL;
+		    pp.answered = FALSE;
+		} else {
+		    pa.answered = FALSE;
+		}
+	    } else {
+		pa.answered = FALSE;
+	    }
+	    write(node->pp_write_answer_pipe, &pa, sizeof(PingedPeerAnswer));
+	    break;
+	}
+
+	g_free(ppm->key);
+	ppm->key = NULL;
+    }
+
+exit:
+    if ( ppm->key )
+	g_free(ppm->key);
+    g_free(ppm);
+    
+    close(node->pp_write_answer_pipe);
+    close(node->pp_read_pipe);
+
+    pthread_exit(NULL);
+}
+
+static void
+pinged_peer_pong(AVMONNode *node, const char *key)
+{
+    PingedPeerMessage ppm;
+    ppm.key = g_strdup(key);
+    ppm.t = PP_PONG;
+    write(node->pp_write_pipe, &ppm, sizeof(PingedPeerMessage));
+}
+
+static void
+pinged_peer_pinged(AVMONNode *node, const char *key)
+{
+    PingedPeerMessage ppm;
+    ppm.key = g_strdup(key);
+    ppm.t = PP_PINGED;
+    write(node->pp_write_pipe, &ppm, sizeof(PingedPeerMessage));
+}
+
+static gboolean
+pinged_peer_answered(AVMONNode *node, const char *key)
+{
+    PingedPeerMessage ppm;
+    PingedPeerAnswer ppa;
+    memset(&ppa, 0, sizeof(PingedPeerAnswer));
+
+    ppm.key = g_strdup(key);
+    ppm.t = PP_ANSWERED;
+    write(node->pp_write_pipe, &ppm, sizeof(PingedPeerMessage));
+
+    read(node->pp_read_answer_pipe, &ppa, sizeof(PingedPeerAnswer));
+
+    return ppa.answered;
+}
+
 void
 avmon_receive_cv_pong(AVMONNode *node, const char *ip, const uint8_t *buff)
 {
@@ -890,11 +1060,7 @@ avmon_receive_cv_pong(AVMONNode *node, const char *ip, const uint8_t *buff)
 	return;
     }
 
-    if ( g_str_equal(peer->key, node->pinged_peer->key) ) {
-	peer->answered_ping = TRUE;
-    } else {
-	//TODO: log something
-    }
+    pinged_peer_pong(node, peer->key);
 }
 
 void
@@ -1251,19 +1417,17 @@ main_loop(void *_node)
 	    continue;
 	
 	//cv_ping
-	node->pinged_peer = cv_random_peer(node);
-	if ( node->pinged_peer ) {
-	    node->pinged_peer->answered_ping = FALSE;
-	    msg_send_cv_ping(node->pinged_peer->ip, node->pinged_peer->port,
-			     node->port);
-	    sleep(5); //TODO: make configurable
-	
-	    if ( !node->pinged_peer->answered_ping ) {
-		cv_delete(node, node->pinged_peer);
-		peer_free(node->pinged_peer); //TODO
-	    }
+	{
+	    AVMONPeer *pinged_peer = cv_random_peer(node);
+	    if ( pinged_peer ) {
+		pinged_peer_pinged(node, pinged_peer->key);
+		msg_send_cv_ping(pinged_peer->ip, pinged_peer->port, node->port);
+		sleep(5); //TODO: make configurable?
 
-	    node->pinged_peer = NULL;
+		if ( !pinged_peer_answered(node, pinged_peer->key) )
+		    cv_delete(node, pinged_peer);
+		peer_free(pinged_peer);
+	    }
 	}
 
 	//contact random
@@ -1981,6 +2145,9 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
     read_previous_session_time(node);
     load_cached_sets(node);
 
+    //
+    pthread_create(&node->p_tid, NULL, pinged_peer_loop, (void *) node);
+
     //main protocol loop
 #ifdef DEBUG
     g_debug("starting protocol loop");
@@ -2152,6 +2319,19 @@ avmon_stop(AVMONNode *node, GError **gerror)
 	return -1;
     }
     pthread_join(node->tid, NULL);
+
+    {
+	PingedPeerMessage ppm;
+	ppm.key = NULL;
+	ppm.t = PP_EXIT;
+	if ( write(node->pp_write_pipe, &ppm, 
+		   sizeof(PingedPeerMessage)) == -1 ) {
+	    util_set_error_errno(gerror, AVMON_ERROR, AVMON_ERROR_STOP,
+				 "pp pipe");
+	    return -1;
+	}
+	pthread_join(node->p_tid, NULL);
+    }
 
     record_session_end(node, save_sets(node));
 
