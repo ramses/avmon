@@ -1424,9 +1424,10 @@ main_loop(void *_node)
 		msg_send_cv_ping(pinged_peer->ip, pinged_peer->port, node->port);
 		sleep(5); //TODO: make configurable?
 
-		if ( !pinged_peer_answered(node, pinged_peer->key) )
+		if ( !pinged_peer_answered(node, pinged_peer->key) ) {
 		    cv_delete(node, pinged_peer);
-		peer_free(pinged_peer);
+		    peer_free(pinged_peer);
+		}
 	    }
 	}
 
