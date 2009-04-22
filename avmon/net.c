@@ -260,12 +260,13 @@ net_char_to_addrinfo(const char *name_or_ip, const char *port, GError **gerror)
 static char _myIP[IPSIZE + 1] = { '\0' };
 
 const char *
-net_my_ip(GError **gerror)
+net_my_ip(gboolean public, GError **gerror)
 {
     struct addrinfo hints, *ai = NULL, *p = NULL;
     struct sockaddr_in *sain;
     char hostname[128];
     int error;
+    gboolean private;
 
     if ( _myIP[0] )
         return _myIP;
@@ -289,12 +290,22 @@ net_my_ip(GError **gerror)
 
 	inet_ntop(AF_INET, &sain->sin_addr, _myIP, sizeof(_myIP));
 
-	if ( strstr(_myIP, "127.0.0.1") == NULL )
+	if ( g_str_equal(_myIP, "127.0.0.1") )
+	    continue;
+
+	private = (g_str_has_prefix(_myIP, "192.168.")
+		   || g_str_has_prefix(_myIP, "10.")
+		   || g_str_hash_prefix(_myIP, "172.16.")) 
+	    ? TRUE : FALSE;
+
+	if ( public && !private )
+	    break;
+	if ( !public && private )
 	    break;
     }
 
     if ( !ai ) {
-	g_set_error(gerror, NET_ERROR, NET_ERROR_GEN, "Didn't find non-local IP for %s", hostname);
+	g_set_error(gerror, NET_ERROR, NET_ERROR_GEN, "Didn't find proper IP for %s", hostname);
 	goto exit_with_error;
     }
 

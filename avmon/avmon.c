@@ -611,7 +611,7 @@ avmon_node_new(int K, int N, Conf *conf, GError **gerror)
 
     node->ip_c = conf_get_host_ip(conf);
     if ( !node->ip_c ) {
-	node->ip_c = g_strdup(net_my_ip(gerror));
+	node->ip_c = g_strdup(net_my_ip(TRUE, gerror)); //TODO: make public/private IP pref configurable
 	if ( *gerror )
 	    g_error("%s\nPlease use host_ip option in configuration file",
 		    (*gerror)->message); //aborts

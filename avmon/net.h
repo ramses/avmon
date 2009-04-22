@@ -65,7 +65,7 @@ int net_connect_nb(int socketfd, struct sockaddr *peer_addr, int peer_addr_size,
  */
 struct addrinfo *net_char_to_addrinfo(const char *name_or_ip, const char *port,
 				      GError **gerror);
-const char *net_my_ip(GError **gerror);
+const char *net_my_ip(gboolean public, GError **gerror);
 int net_read_32bit(int socketfd, uint32_t *u32, GError **gerror);
 int net_read_16bit(int socketfd, uint16_t *u16, GError **gerror);
 
