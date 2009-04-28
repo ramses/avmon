@@ -109,6 +109,7 @@ handle_join(void *args)
 
     inet_ntop(AF_INET, &pargs->peer_addr.sin_addr, ip, NET_IP_CHAR_SIZE);
     avmon_receive_join(pargs->al->node, pargs->connection_fd, ip);
+    close(pargs->connection_fd);
 
     util_counter_dec(pargs->al->tcp_thread_count);
 
@@ -131,6 +132,7 @@ handle_cv_fetch(void *args)
 #endif
 
     avmon_receive_cv_fetch(pargs->al->node, pargs->connection_fd);
+    close(pargs->connection_fd);
 
     util_counter_dec(pargs->al->tcp_thread_count);
 
@@ -153,6 +155,7 @@ handle_get_ps(void *args)
 #endif
 
     avmon_receive_get_ps(pargs->al->node, pargs->connection_fd);
+    close(pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
 
@@ -171,6 +174,7 @@ handle_get_ts(void *args)
     pthread_detach(pthread_self());
     
     avmon_receive_get_ts(pargs->al->node, pargs->connection_fd);
+    close(pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
     
@@ -193,6 +197,7 @@ handle_get_raw_availability(void *args)
 #endif
     
     avmon_receive_get_raw_availability(pargs->al->node, pargs->connection_fd);
+    close(pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
 
@@ -209,6 +214,7 @@ handle_get_last_heard_of_ts(void *args)
     pthread_detach(pthread_self());
     
     avmon_receive_get_last_heard_of_ts(pargs->al->node, pargs->connection_fd);
+    close(pargs->connection_fd);
     
     util_counter_dec(pargs->al->tcp_thread_count);
     
