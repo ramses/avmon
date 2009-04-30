@@ -295,7 +295,7 @@ net_my_ip(gboolean public, GError **gerror)
 
 	private = (g_str_has_prefix(_myIP, "192.168.")
 		   || g_str_has_prefix(_myIP, "10.")
-		   || g_str_hash_prefix(_myIP, "172.16.")) 
+		   || g_str_has_prefix(_myIP, "172.16.")) 
 	    ? TRUE : FALSE;
 
 	if ( public && !private )

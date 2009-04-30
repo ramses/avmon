@@ -65,6 +65,20 @@ int conf_get_introducer_timeout(Conf *conf);
  * after use.
  */
 char *conf_get_host_ip(Conf *conf);
+/**
+ * 
+ * Define public_ip=true in the configuration file if host_ip is not defined
+ * to force avmon to use a public ip address, instead of a private ip address.
+ * If public_ip=false and host_ip is not defined, avmon will try to use a private
+ * ip address.
+ *
+ * This is useful only in hosts with multiple ip interfaces.
+ *
+ * @param[in] conf
+ * @return true or false according to the configuration file. Default is true ifd
+ * not defined.
+ */
+gboolean conf_use_public_ip(Conf *conf);
 gboolean conf_enable_forgetful_pinging(Conf *conf);
 enum ConfSessionFixMethod conf_get_session_fix_method(Conf *conf);
 

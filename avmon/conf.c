@@ -44,6 +44,7 @@
 #define CONF_GROUP_LISTENER   "listener"
 #define CONF_host_ip          "host_ip"
 #define CONF_tcp_udp_port     "tcp_udp_port"
+#define CONF_public_ip        "public_ip"    //used only if host_ip not defined
 
 #define CONF_GROUP_PROTOCOL   "protocol"
 #define CONF_period           "period"
@@ -79,6 +80,7 @@ struct _Conf {
 
     int listener_tcp_udp_port;
     char *host_ip;
+    gboolean public_ip;
 
     int protocol_period;
     gboolean enable_forgetful_pinging;
@@ -116,6 +118,7 @@ conf_load(const char *fname, GError **gerror)
     conf->introducer_name = NULL;
     conf->default_av_output_prefix = NULL;
     conf->host_ip = NULL;
+    conf->public_ip = TRUE;
     
     // INTRODUCER CONF
     conf->introducer_name =
@@ -166,6 +169,15 @@ conf_load(const char *fname, GError **gerror)
 		goto exit_with_error;
 	    }
 	}
+    } else if ( g_key_file_has_key(gkf, CONF_GROUP_LISTENER, CONF_public_ip,
+				   gerror) ) {
+	if ( *gerror )
+	    goto exit_with_error;
+	
+	conf->public_ip = g_key_file_get_boolean(gkf, CONF_GROUP_LISTENER,
+						 CONF_public_ip, gerror);
+	if ( *gerror )
+	    goto exit_with_error;
     }
 
     // JOIN CONF
@@ -304,4 +316,10 @@ enum ConfSessionFixMethod
 conf_get_session_fix_method(Conf *conf)
 {
     return conf->csfm;
+}
+
+gboolean
+conf_use_public_ip(Conf *conf) 
+{
+    return conf->public_ip;
 }
