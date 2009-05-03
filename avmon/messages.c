@@ -667,13 +667,22 @@ GPtrArray *
 msg_ids_from_notify_buff(const uint8_t *buff, GError **gerror)
 {
     uint16_t bytes;
-    char **p, **split, *ip_c, *port_c;
+    char **p, **split = NULL, *ip_c, *port_c, *unsplit;
     GPtrArray *numbers = g_ptr_array_new();
+    int i = 0;
     
     memcpy(&bytes, &buff[MSG_HEAD_SIZE + 1], 2);
     bytes = ntohs(bytes);
-    
-    p = split = g_strsplit(&((const char *)buff)[MSG_HEAD_SIZE + 1 + 2], MSG_DELIMITER_S, 0);
+
+    if ( !bytes ) {
+	g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS, "no ids");	
+	goto exit_with_error;
+    }
+
+    unsplit = (char *) g_malloc0(bytes + 1);
+    memcpy(unsplit, &buff[MSG_HEAD_SIZE + 1 + 2], bytes);
+    p = split = g_strsplit(unsplit, MSG_DELIMITER_S, 0);
+    g_free(unsplit);
 
     do {
 	ip_c = *p;
@@ -682,18 +691,47 @@ msg_ids_from_notify_buff(const uint8_t *buff, GError **gerror)
 	p++;
 
 	if ( !ip_c || !port_c ) {
-	    g_strfreev(split);
-	    g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS, "malformed incoming IDS");
-	    return NULL;
+	    g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS, "null data");
+	    goto exit_with_error;
+	}
+
+	{ //TODO: move this inside net.c
+	    struct sockaddr_in blah;
+	    memset(&blah, 0, sizeof(struct sockaddr_in));
+	    if ( inet_pton(AF_INET, ip_c, &blah.sin_addr) <= 0 ) {
+		g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS, "not an IP %s", ip_c);
+		goto exit_with_error;
+	    }
+	}
+	{ //TODO: move this inside net.c
+	    long int port = strtol(port_c, NULL, 10);
+	    if ( !port || port == LONG_MIN || port == LONG_MAX || port > 65535 ) {
+		g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS, "not a valid port %s", port_c);
+		goto exit_with_error;
+	    }
 	}
 	
 	g_ptr_array_add(numbers, g_strdup(ip_c));
 	g_ptr_array_add(numbers, g_strdup(port_c));
+	i += 2;
+	if ( i > 4 ) {
+	    g_set_error(gerror, MSG_ERROR, MSG_ERROR_IDS, "two many ids %s, %s", ip_c, port_c);
+	    goto exit_with_error;
+	}
     } while ( *p );
 
     g_strfreev(split);
 
     return numbers;
+
+exit_with_error:
+    if ( split )
+	g_strfreev(split);
+    for ( ; i > 0; i-- )
+	g_free(g_ptr_array_index(numbers, i - 1));
+    g_ptr_array_free(numbers, TRUE);
+    
+    return NULL;
 }
 
 int
