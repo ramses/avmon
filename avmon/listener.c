@@ -593,7 +593,12 @@ udp_listener_start(AVMONListener *al, GError **error)
     servaddr.sin_port = al->udp_port;
     
     al->udp_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    bind(al->udp_fd, (struct sockaddr *) &servaddr, sizeof(servaddr));
+    if ( bind(al->udp_fd, (struct sockaddr *) &servaddr, sizeof(servaddr)) ) {
+	util_set_error_errno(error, AVMON_LISTENER_ERROR,
+			     AVMON_LISTENER_ERROR_START_UDP, "error binding to udp port");
+	close(al->udp_fd);
+	return -1;
+    }
 
     if ( pthread_create(&al->udp_listener_thread, NULL, udp_listener,
 			(void *) al) ) {
