@@ -1,0 +1,70 @@
+v1.0 TODO
+
+This is the list
+v1.0 TODO
+======================
+
+The following is a list of features that need to be implemented for v1.0.
+Patches are welcome :-)
+
+Any comments, questions, patches, please email them to
+avmon@ramsesmorales.com.
+
+	[_] Decouple IP:PORT and host-key
+		: The default AVMON host-key is the concatenation of IP address, :,
+		: and PORT. AVMON can support arbitrary host keys unrelated to IP and
+		: PORT, and implementing this feature is important for many reasons --
+		: the two most important reasons are:
+		: 
+		: (1) Distributed applications and P2P systems usually have their own
+		: way to identify hosts/processes -- e.g., FreePastry creates an ID
+		: based on SHA1; another system might prefer to use the public part of a
+		: cryptographic key-pair as host/process ID. AVMON should 
+		: allow such systems to monitor and query hosts/processes using their
+		: own keys/ids.
+		: (2) Read the following TODO...
+	[_] Implement NAT traversal, using STUN and TURN protocols, and tunneling
+	    to unNATed hosts.
+		: This is required to support monitors and targets that are behind
+		: NATs and want to be part of an Internet-wide AVMON deployment.
+	[_] Allow applications to install their own monitors.
+		: How to actually monitor and store the monitoring results are
+		: orthogonal issues to AVMON. Currently AVMON implements a default
+		: raw-availability monitor -- monitors send a single ping
+		: periodically, and the replies are stored on disk, thus allowing
+		: querying of historical availability. Applications might have
+		: particular monitoring needs, such as a one-hour window availability,
+		: aged availability, etc. AVMON must allow installation of different
+		: availability algorithms.
+		:
+		[X] Implement callback system in avmon.c
+		[_] Add support in listener.c for user defined availability-monitoring
+		    messages.
+		[_] Add support in messages.c for user defined availability-monitoring
+		    messages.
+		[_] Add support in avmon.c for user defined availability-monitoring
+		    messages.
+	[_] Implement a default mechanism to answer queries about offline AVMON
+	    nodes.
+		: To answer an availability query, the target node is contacted, and
+		: it then supplies its list of monitors. These monitors can be contacted
+		: afterwards to learn the measured availability of the target node.
+		: Currently, the application using AVMON needs to cache the list of
+		: monitors, if it wants to learn the historical availability of a
+		: target node that is offline at the moment. It would be nice to
+		: offload this responsibility from the application, and provide a
+		: default mechanism to learn the monitors of an offline target.
+		[_] Decide between the following approaches and implement one:
+			[_] Use a DHT to store monitor sets.
+				: Pros: fully distributed solution. Instant replies.
+				: Cons: lack of a robust DHT implemented in C language.
+			[_] Use a gossiping protocol to ask online nodes to discover the
+			    monitors of a target node.
+				: This approach would take advantage of AVMON's shuffling
+				: mechanism that discovers monitor-target relations.
+				: Pros: fully distributed solution. Does not require an
+				: additional system.
+				: Cons: learning the set of monitors won't be as fast as with
+				: the DHT approach.
+
+
