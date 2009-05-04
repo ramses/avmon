@@ -782,11 +782,10 @@ check_condition_i(gpointer key, gpointer value, gpointer data)
     if ( ccd->check ) {
 	if ( !g_hash_table_lookup(ccd->tmp_cvx_cvw, peer->key) )
 	    g_hash_table_insert(ccd->tmp_cvx_cvw, peer->key, peer);
-	else
+	else if ( peer->peer_cv )
 	    g_ptr_array_add(ccd->incoming_duplicate, peer);
     } else {
-	if ( peer->peer_cv )
-	    g_hash_table_insert(ccd->tmp_cvx_cvw, peer->key, peer);
+	g_hash_table_insert(ccd->tmp_cvx_cvw, peer->key, peer);
     }
     ccd->i = value;
     g_hash_table_foreach(ccd->cv, check_condition_j, ccd);
