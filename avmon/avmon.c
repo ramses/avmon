@@ -2068,6 +2068,9 @@ avmon_start(const char *conf_file, int K, int N, GError **gerror)
 
     net_init();
 
+    if ( !g_thread_supported () )
+	g_thread_init (NULL);
+
     //configuration:
 #ifdef DEBUG
     g_debug("loading configuration");
