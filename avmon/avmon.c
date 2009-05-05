@@ -1080,7 +1080,10 @@ avmon_receive_monitoring_ping(AVMONNode *node, const uint8_t *buff,
     }
 
     msg_send_monitoring_pong(peer_addr, peer_port, node->port, &gerror);
-    //TODO: log error
+    if ( gerror ) {
+	//TODO: log error
+	g_error_free(gerror);
+    }
 }
 
 void
@@ -1099,7 +1102,10 @@ avmon_receive_cv_ping(AVMONNode *node, const uint8_t *buff,
     }
 
     msg_send_cv_pong(peer_addr, peer_port, node->port, &gerror);
-    //TODO: log error
+    if ( gerror ) {
+	//TODO: log error
+	g_error_free(gerror);
+    }
 }
 
 void
@@ -1215,6 +1221,10 @@ avmon_receive_join(AVMONNode *node, int socketfd, const char *peer_ip)
 
     peer_array = cv_to_array(node);
     msg_write_join_reply(socketfd, peer_array, &gerror);
+    if ( gerror ) {
+	//TODO: log?
+	g_error_free(gerror);
+    }
     g_ptr_array_free(peer_array, TRUE);
 }
 
@@ -2013,9 +2023,12 @@ read_previous_session_time(AVMONNode *node)
 				       SESSION_RECORD_SEPARATOR, ct.tv_sec);
 		g_io_channel_write_chars(sessions, buff, -1, &bytes_written,
 					 &gerror);
-		if ( gerror )
+		if ( gerror ) {
 		    g_critical("Could not write to %s: %s", sessions_name,
 			       gerror->message);
+		    g_error_free(gerror);
+		    gerror = NULL;
+		}
 		g_free(buff);
 		g_warning("session END %s is an auto-fix", split1[2]);
 
@@ -2189,6 +2202,10 @@ save_ps_peer(gpointer _key, gpointer _peer, gpointer _ps_cache)
     
     g_io_channel_write_chars((GIOChannel *) _ps_cache, buff, -1, &bytes_written,
 			     &gerror);
+    if ( gerror ) {
+	//TODO: log?
+	g_error_free(gerror);
+    }
     g_free(buff);
 }
 
@@ -2206,6 +2223,10 @@ save_ts_peer(gpointer _key, gpointer _peer, gpointer _ts_cache)
 				 
     g_io_channel_write_chars((GIOChannel *) _ts_cache, buff, -1, &bytes_written,
 			     &gerror);
+    if ( gerror ) {
+	//TODO: log?
+	g_error_free(gerror);
+    }
     g_free(buff);
 }
 
@@ -2649,6 +2670,8 @@ avmon_receive_get_ts(AVMONNode *node, int socketfd)
     GPtrArray *ts_array = ts_to_array(node);
 
     msg_write_get_ts_reply(socketfd, ts_array, &gerror);
+    if ( gerror )
+	g_error_free(gerror);
 }
 
 //TODO: session IO should be outside avmon.c
@@ -3311,6 +3334,8 @@ avmon_receive_get_last_heard_of_ts(AVMONNode *node, int socketfd)
     }
     
     msg_write_get_last_heard_of_ts_reply(socketfd, ts_array, data_array, &gerror);
+    if ( gerror )
+	g_error_free(gerror);
 
     for ( i = 0; i < ts_array->len; i++ )
 	g_free(g_ptr_array_index(data_array, i));
